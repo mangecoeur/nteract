@@ -121,6 +121,16 @@ export const edit = {
   ],
 };
 
+export const cell = {
+  label: 'Cell',
+  submenu: [
+    {
+      label: 'Run All',
+      click: createSender('menu:run-all')
+    },
+  ],
+};
+
 export const view = {
   label: 'View',
   submenu: [
@@ -350,6 +360,7 @@ export function loadFullMenu() {
 
     template.push(fileWithNew);
     template.push(edit);
+    template.push(cell);
     template.push(view);
 
     // Application specific functionality should go before window and help
