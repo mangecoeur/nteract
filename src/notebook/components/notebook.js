@@ -1,8 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
 import { DragDropContext as dragDropContext } from 'react-dnd';
 import HTML5Backend from 'react-dnd-html5-backend';
+import { connect } from 'react-redux';
 
+import Cell from './cell/cell';
 import DraggableCell from './cell/draggable-cell';
 import CellCreator from './cell/cell-creator';
 import { executeCell, focusNextCell, moveCell } from '../actions';
@@ -16,15 +19,34 @@ import { displayOrder, transforms } from 'transformime-react';
 // Always set up the markdown mode
 require('codemirror/mode/markdown/markdown');
 
+const mapStateToProps = (state) => ({
+  theme: state.document.theme,
+  notebook: state.document.get('notebook'),
+  channels: state.app.channels,
+  cellPagers: state.document.get('cellPagers'),
+  focusedCell: state.document.get('focusedCell'),
+  cellStatuses: state.document.get('cellStatuses'),
+  stickyCells: state.document.get('stickyCells'),
+  notificationSystem: state.app.notificationSystem,
+  kernelConnected: state.app.channels &&
+    !(state.app.executionState === 'starting' ||
+      state.app.executionState === 'not connected'),
+});
+
 class Notebook extends React.Component {
   static propTypes = {
     channels: React.PropTypes.any,
+    dispatch: React.PropTypes.func,
     displayOrder: React.PropTypes.instanceOf(Immutable.List),
     notebook: React.PropTypes.any,
     transforms: React.PropTypes.instanceOf(Immutable.Map),
     cellPagers: React.PropTypes.instanceOf(Immutable.Map),
     cellStatuses: React.PropTypes.instanceOf(Immutable.Map),
+    stickyCells: React.PropTypes.instanceOf(Immutable.Map),
     focusedCell: React.PropTypes.string,
+    theme: React.PropTypes.string,
+    kernelConnected: React.PropTypes.bool,
+    notificationSystem: React.PropTypes.any,
   };
 
   static defaultProps = {
@@ -32,27 +54,21 @@ class Notebook extends React.Component {
     transforms,
   };
 
-  static contextTypes = {
+  static propsTypes = {
     dispatch: React.PropTypes.func,
-  };
-
-  static childContextTypes = {
-    channels: React.PropTypes.object,
+    notificationSystem: React.PropTypes.any,
+    kernelConnected: React.PropTypes.bool,
   };
 
   constructor() {
     super();
+    this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
     this.languageCache = {};
     this.createCellElement = this.createCellElement.bind(this);
+    this.createStickyCellElement = this.createStickyCellElement.bind(this);
     this.keyDown = this.keyDown.bind(this);
     this.moveCell = this.moveCell.bind(this);
     this.getCompletions = this.getCompletions.bind(this);
-  }
-
-  getChildContext() {
-    return {
-      channels: this.props.channels,
-    };
   }
 
   componentDidMount() {
@@ -63,6 +79,14 @@ class Notebook extends React.Component {
     if (nextProps.focusedCell !== this.props.focusedCell) {
       this.resolveScrollPosition(nextProps.focusedCell);
     }
+  }
+
+  componentDidUpdate() {
+    // Make sure the document is vertically shifted so the top non-stickied
+    // cell is always visible.
+    const placeholder = ReactDOM.findDOMNode(this.refs['sticky-cells-placeholder']);
+    const container = ReactDOM.findDOMNode(this.refs['sticky-cell-container']);
+    placeholder.style.height = `${container.clientHeight}px`;
   }
 
   componentWillUnmount() {
@@ -95,13 +119,13 @@ class Notebook extends React.Component {
       // This is the notebook though, so hands off
       // We'll want to check for this existing later
       // and any other validation
-      require(`codemirror/mode/${language}/${language}`);
+      require(`codemirror/mode/${language}/${language}`); // eslint-disable-line global-require
     }
     return language;
   }
 
   moveCell(sourceId, destinationId, above) {
-    this.context.dispatch(moveCell(sourceId, destinationId, above));
+    this.props.dispatch(moveCell(sourceId, destinationId, above));
   }
 
 
@@ -126,12 +150,18 @@ class Notebook extends React.Component {
     const cell = cellMap.get(id);
 
     if (e.shiftKey) {
-      this.context.dispatch(focusNextCell(this.props.focusedCell));
+      this.props.dispatch(focusNextCell(this.props.focusedCell, true));
     }
 
     if (cell.get('cell_type') === 'code') {
-      this.context.dispatch(
-        executeCell(this.props.channels, id, cell.get('source'))
+      this.props.dispatch(
+        executeCell(
+          this.props.channels,
+          id,
+          cell.get('source'),
+          this.props.kernelConnected,
+          this.props.notificationSystem
+        )
       );
     }
   }
@@ -164,54 +194,69 @@ class Notebook extends React.Component {
     }
   }
 
+  createCellProps(id, cell) {
+    return {
+      id,
+      cell,
+      language: this.getLanguageMode(),
+      getCompletions: this.getCompletions,
+      key: id,
+      ref: id,
+      displayOrder: this.props.displayOrder,
+      transforms: this.props.transforms,
+      moveCell: this.moveCell,
+      pagers: this.props.cellPagers.get(id),
+      focusedCell: this.props.focusedCell,
+      running: this.props.cellStatuses.get(id) === 'busy',
+      theme: this.props.theme,
+    };
+  }
+
   createCellElement(id) {
     const cellMap = this.props.notebook.get('cellMap');
+    const cell = cellMap.get(id);
+    const isStickied = this.props.stickyCells.get(id);
     return (
-      <div
-        key={`cell-container-${id}`}
-        ref="container"
-      >
-        <DraggableCell
-          cell={cellMap.get(id)}
-          language={this.getLanguageMode()}
-          getCompletions={this.getCompletions}
-          id={id}
-          key={id}
-          ref={id}
-          displayOrder={this.props.displayOrder}
-          transforms={this.props.transforms}
-          moveCell={this.moveCell}
-          pagers={this.props.cellPagers.get(id)}
-          focusedCell={this.props.focusedCell}
-          running={this.props.cellStatuses.get(id) === 'busy'}
-        />
+      <div key={`cell-container-${id}`} ref="container">
+        {isStickied ?
+          <div className="cell-placeholder">
+            <span className="octicon octicon-link-external" />
+          </div> :
+          <DraggableCell {...this.createCellProps(id, cell)} />}
         <CellCreator key={`creator-${id}`} id={id} above={false} />
+      </div>);
+  }
+
+  createStickyCellElement(id) {
+    const cellMap = this.props.notebook.get('cellMap');
+    const cell = cellMap.get(id);
+    return (
+      <div key={`cell-container-${id}`} ref="container">
+        <Cell {...this.createCellProps(id, cell)} />
       </div>);
   }
 
   render() {
     if (!this.props.notebook) {
       return (
-        <div></div>
+        <div className="notebook"></div>
       );
     }
     const cellOrder = this.props.notebook.get('cellOrder');
     return (
-      <div
-        style={{
-          paddingTop: '10px',
-          paddingLeft: '10px',
-          paddingRight: '10px',
-        }}
-        ref="cells"
-      >
+      <div className="notebook" ref="cells">
+        <div className="sticky-cells-placeholder" ref="sticky-cells-placeholder" />
+        <div className="sticky-cell-container" ref="sticky-cell-container">
+          {cellOrder
+            .filter(id => this.props.stickyCells.get(id))
+            .map(this.createStickyCellElement)}
+        </div>
         <CellCreator id={cellOrder.get(0, null)} above />
-      {
-        cellOrder.map(this.createCellElement)
-      }
+        {cellOrder.map(this.createCellElement)}
       </div>
     );
   }
 }
 
-export default dragDropContext(HTML5Backend)(Notebook);
+export const ConnectedNotebook = dragDropContext(HTML5Backend)(Notebook);
+export default connect(mapStateToProps)(ConnectedNotebook);

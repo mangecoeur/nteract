@@ -1,4 +1,4 @@
-const Rx = require('@reactivex/rxjs');
+const Rx = require('rxjs/Rx');
 const Immutable = require('immutable');
 
 import {
@@ -15,9 +15,13 @@ import {
   updateCellPagers,
   updateCellStatus,
   setLanguageInfo,
+  associateCellToMsg,
 } from '../actions';
 
+import { mark, measure } from '../performance';
+
 export function acquireKernelInfo(channels) {
+  mark('acquireKernelInfo:enter');
   const { shell } = channels;
 
   const message = createMessage('kernel_info_request');
@@ -61,10 +65,12 @@ function reduceOutputs(outputs, output) {
     }
   }
 
+  mark('acquireKernelInfo:exit');
   return outputs.push(Immutable.fromJS(output));
 }
 
-export function executeCell(channels, id, code) {
+export function executeCell(store, channels, id, code) {
+  mark('executeCell:enter');
   return Rx.Observable.create((subscriber) => {
     if (!channels || !channels.iopub || !channels.shell) {
       subscriber.error('kernel not connected');
@@ -78,6 +84,7 @@ export function executeCell(channels, id, code) {
     const subscriptions = [];
 
     const executeRequest = createExecuteRequest(code);
+    subscriber.next(associateCellToMsg(id, executeRequest.header.msg_id));
 
     const shellChildren = shell.childOf(executeRequest).share();
 
@@ -112,10 +119,18 @@ export function executeCell(channels, id, code) {
           subscriber.next(updateCellPagers(id, pagerDatas));
         }));
 
-    const childMessages = iopub.childOf(executeRequest)
-                               .share();
+    // Messages that should affect the cell's output are both messages child
+    // to the execution request and messages mapped to the cell (from widget
+    // interaction, for example).
+    const cellMessages = iopub
+      .filter(msg => {
+        const state = store.getState();
+        return executeRequest.header.msg_id === msg.parent_header.msg_id || // child msg
+          state.document.getIn(['cellMsgAssociations', id]) === msg.parent_header.msg_id; // mapped
+      })
+      .share();
 
-    childMessages
+    cellMessages
       .ofMessageType(['status'])
       .pluck('content', 'execution_state')
       .subscribe((status) => {
@@ -124,7 +139,7 @@ export function executeCell(channels, id, code) {
 
     // Update the input numbering: `[ ]`
     subscriptions.push(
-      childMessages.ofMessageType(['execute_input'])
+      cellMessages.ofMessageType(['execute_input'])
                  .pluck('content', 'execution_count')
                  .first()
                  .subscribe((ct) => {
@@ -134,18 +149,21 @@ export function executeCell(channels, id, code) {
 
     // Handle all nbformattable messages, clearing output first
     subscriber.next(updateCellOutputs(id, new Immutable.List()));
-    subscriptions.push(childMessages
+    subscriptions.push(cellMessages
          .ofMessageType(['execute_result', 'display_data', 'stream', 'error', 'clear_output'])
          .map(msgSpecToNotebookFormat)
          // Iteratively reduce on the outputs
          .scan(reduceOutputs, emptyOutputs)
          // Update the outputs with each change
          .subscribe(outputs => {
+           mark('executeCell:output');
+           measure('executeCell:roundtrip', 'executeCell:enter', 'executeCell:output');
            subscriber.next(updateCellOutputs(id, outputs));
          })
     );
 
     shell.next(executeRequest);
+    mark('executeCell:exit');
 
     return function executionDisposed() {
       subscriptions.forEach((sub) => sub.unsubscribe());

@@ -1,4 +1,4 @@
-import { dialog, app, Menu } from 'electron';
+import { dialog, app, shell, Menu } from 'electron';
 
 const kernelspecs = require('kernelspecs');
 
@@ -88,12 +88,12 @@ export const edit = {
     {
       label: 'Undo',
       accelerator: 'CmdOrCtrl+Z',
-      role: 'undo',
+      click: createSender('menu:undo'),
     },
     {
       label: 'Redo',
       accelerator: 'Shift+CmdOrCtrl+Z',
-      role: 'redo',
+      click: createSender('menu:redo'),
     },
     {
       type: 'separator',
@@ -126,10 +126,45 @@ export const cell = {
   submenu: [
     {
       label: 'Run All',
-      click: createSender('menu:run-all')
+      click: createSender('menu:run-all'),
+    },
+    {
+      label: 'Clear All',
+      click: createSender('menu:clear-all'),
     },
   ],
 };
+const theme_menu = [
+  {
+    label: 'Light',
+    click: createSender('menu:theme', 'light'),
+  },
+  {
+    label: 'Dark',
+    click: createSender('menu:theme', 'dark'),
+  },
+  {
+    label: 'Classic',
+    click: createSender('menu:theme', 'classic'),
+  },
+];
+
+const today = new Date();
+const day = today.getDate();
+const month = today.getMonth() + 1;
+if (month === 12) {
+  theme_menu.push(
+    {
+      label: 'Hohoho',
+      click: createSender('menu:theme', 'christmas'),
+    });
+} else if (month === 10 && day === 31) {
+  theme_menu.push({
+    label: 'Mwaaahahahhah',
+    click: createSender('menu:theme', 'halloween'),
+  });
+}
+
 
 export const view = {
   label: 'View',
@@ -172,20 +207,22 @@ export const view = {
       },
     },
     {
+      label: 'Zoom In',
+      accelerator: 'CmdOrCtrl+=',
+      click: createSender('menu:zoom-in'),
+    },
+    {
+      label: 'Zoom Out',
+      accelerator: 'CmdOrCtrl+-',
+      click: createSender('menu:zoom-out'),
+    },
+    {
       label: 'Theme',
-      submenu: [
-        {
-          label: 'Light',
-          click: createSender('menu:theme', 'light'),
-        },
-        {
-          label: 'Dark',
-          click: createSender('menu:theme', 'dark'),
-        },
-      ],
+      submenu: theme_menu,
     },
   ],
 };
+
 
 export const publish = {
   label: 'Publish',
@@ -234,7 +271,7 @@ export const help = {
   submenu: [
     {
       label: 'Learn More',
-      click: () => { require('electron').shell.openExternal('http://github.com/nteract/nteract'); },
+      click: () => { shell.openExternal('http://github.com/nteract/nteract'); },
     },
   ],
 };
@@ -329,6 +366,18 @@ export function loadFullMenu() {
         {
           label: '&Kill Running Kernel',
           click: createSender('menu:kill-kernel'),
+        },
+        {
+          label: '&Interrupt Running Kernel',
+          click: createSender('menu:interrupt-kernel'),
+        },
+        {
+          label: 'Restart Running Kernel',
+          click: createSender('menu:restart-kernel'),
+        },
+        {
+          label: 'Restart and Clear All Cells',
+          click: createSender('menu:restart-and-clear-all'),
         },
         {
           type: 'separator',

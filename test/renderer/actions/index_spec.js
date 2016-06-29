@@ -1,12 +1,22 @@
 import { expect } from 'chai';
+import path from 'path';
 
 import * as actions from '../../../src/notebook/actions';
 
 import * as constants from '../../../src/notebook/constants';
 
-import createStore from '../../../src/notebook/store';
+import { dummyStore } from '../../utils';
 
-const Rx = require('@reactivex/rxjs');
+import {
+  dummyJSON,
+  dummyCommutable
+} from '../dummy-nb';
+
+import {
+  fromJS
+} from 'immutable';
+
+const Rx = require('rxjs/Rx');
 
 describe('setExecutionState', () => {
   it('creates a SET_EXECUTION_STATE action', () => {
@@ -37,6 +47,66 @@ describe('setLanguageInfo', () => {
       langInfo: langInfo,
     });
   })
+});
+
+describe('newKernel', () => {
+  it('creates a NEW_KERNEL action', (done) => {
+    actions.newKernel('python2', '.')()
+      .first()
+      .subscribe((action) => {
+        expect(action.type).to.equal(constants.NEW_KERNEL);
+        expect(action.kernelSpecName).to.equal('python2');
+        done();
+      }, (action) => {
+        expect.fail();
+      });
+  });
+});
+
+describe('save', () => {
+  it('creates a START_SAVING action', (done) => {
+    actions.save('test/test-save.ipynb', dummyCommutable)()
+      .first()
+      .subscribe((action) => {
+        expect(action).to.deep.equal({
+          type: constants.START_SAVING,
+        });
+        done();
+      }, (action) => {
+        expect.fail();
+      });
+  });
+});
+
+describe('saveAs', () => {
+  it('creates a CHANGE_FILENAME action', (done) => {
+    actions.saveAs('test/test-ipynb-saveas.ipynb', dummyCommutable)(actions, dummyStore())
+      .first()
+      .subscribe((action) => {
+        expect(action).to.deep.equal({
+          type: constants.CHANGE_FILENAME,
+          filename: 'test/test-ipynb-saveas.ipynb'
+        });
+        done();
+      }, (action) => {
+        expect.fail();
+      });
+  });
+});
+
+describe('setNotebook', () => {
+  it('creates a SET_NOTEBOOK action', () => {
+    actions.setNotebook(dummyJSON, 'test/test-ipynb.ipynb')(actions, dummyStore())
+      .first()
+      .subscribe((action) => {
+        expect(action).to.deep.equal({
+          type: constants.SET_NOTEBOOK,
+          data: fromJS(dummyJSON)
+        });
+      }, (action) => {
+        expect.fail()
+      });
+  });
 });
 
 describe('updateCellSource', () => {
@@ -115,6 +185,23 @@ describe('focusNextCell', () => {
     expect(actions.focusNextCell('1234')).to.deep.equal({
       type: constants.FOCUS_NEXT_CELL,
       id: '1234',
+      createCellIfUndefined: undefined,
+    });
+  });
+  it('creates a FOCUS_NEXT_CELL action with cell creation flag', () => {
+    expect(actions.focusNextCell('1234', true)).to.deep.equal({
+      type: constants.FOCUS_NEXT_CELL,
+      id: '1234',
+      createCellIfUndefined: true,
+    });
+  });
+});
+
+describe('focusNextCell', () => {
+  it('creates a FOCUS_PREVIOUS_CELL action', () => {
+    expect(actions.focusPreviousCell('1234')).to.deep.equal({
+      type: constants.FOCUS_PREVIOUS_CELL,
+      id: '1234',
     });
   });
 });
@@ -148,6 +235,15 @@ describe('createCellBefore', () => {
   });
 });
 
+describe('toggleStickyCell', () => {
+  it('creates a TOGGLE_STICKY_CELL action', () => {
+    expect(actions.toggleStickyCell('1234')).to.deep.equal({
+      type: constants.TOGGLE_STICKY_CELL,
+      id: '1234',
+    });
+  });
+});
+
 describe('createCellAppend', () => {
   it('creates a NEW_CELL_APPEND action', () => {
     expect(actions.createCellAppend('markdown')).to.deep.equal({
@@ -166,6 +262,15 @@ describe('mergeCellAfter', () => {
   });
 });
 
+describe('setNotificationSystem', () => {
+  it('creates a SET_NOTIFICATION_SYSTEM action', () => {
+    expect(actions.setNotificationSystem(null)).to.deep.equal({
+      type: constants.SET_NOTIFICATION_SYSTEM,
+      notificationSystem: null,
+    });
+  });
+});
+
 describe('overwriteMetadata', () => {
   it('creates an OVERWRITE_METADATA_FIELD', () => {
     expect(actions.overwriteMetadata('foo', {bar: 3})).to.deep.equal({
@@ -176,16 +281,33 @@ describe('overwriteMetadata', () => {
   });
 });
 
+describe('setForwardCheckpoint', () => {
+  it('creates a SET_FORWARD_CHECKPOINT', () => {
+    expect(actions.setForwardCheckpoint(dummyCommutable)).to.deep.equal({
+      type: constants.SET_FORWARD_CHECKPOINT,
+      documentState: dummyCommutable,
+    });
+  });
+});
+
+describe('setBackwardCheckpoint', () => {
+  it('creates a SET_BACKWARD_CHECKPOINT', () => {
+    expect(actions.setBackwardCheckpoint(dummyCommutable, true)).to.deep.equal({
+      type: constants.SET_BACKWARD_CHECKPOINT,
+      documentState: dummyCommutable,
+      clearFutureStack: true,
+    });
+  });
+});
+
 describe('executeCell', () => {
-  it('creates an ERROR_KERNEL_NOT_CONNECTED action with channels not setup', (done) => {
+  it.skip('creates an ERROR_KERNEL_NOT_CONNECTED action with channels not setup', (done) => {
     const channels = {
     };
     const id = '235';
     const source = 'print("hey")';
 
-    const subject = new Rx.Subject();
-
-    subject
+    actions.executeCell(channels, id, source, true, undefined)()
       .first()
       .subscribe((action) => {
         expect(action).to.deep.equal({
@@ -197,8 +319,6 @@ describe('executeCell', () => {
         expect.fail();
       }
     );
-
-    actions.executeCell(channels, id, source)(subject);
   });
 
   // Incomplete test setup, skipping yet providing boilerplate
@@ -222,6 +342,6 @@ describe('executeCell', () => {
       }
     );
 
-    actions.executeCell(channels, id, source)(subject);
+    actions.executeCell(channels, id, source, true, undefined)(subject);
   });
 });

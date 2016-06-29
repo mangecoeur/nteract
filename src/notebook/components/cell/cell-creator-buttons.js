@@ -1,4 +1,6 @@
 import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+import { connect } from 'react-redux';
 
 import {
   createCellAfter,
@@ -6,18 +8,16 @@ import {
   createCellAppend,
   mergeCellAfter } from '../../actions';
 
-export default class CellCreatorButtons extends React.Component {
+export class CellCreatorButtons extends React.Component {
   static propTypes = {
     above: React.PropTypes.bool,
     id: React.PropTypes.string,
-  };
-
-  static contextTypes = {
     dispatch: React.PropTypes.func,
   };
 
   constructor() {
     super();
+    this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
     this.createCodeCell = this.createCell.bind(this, 'code');
     this.createTextCell = this.createCell.bind(this, 'markdown');
     this.createCell = this.createCell.bind(this);
@@ -30,36 +30,33 @@ export default class CellCreatorButtons extends React.Component {
 
   createCell(type) {
     if (!this.props.id) {
-      this.context.dispatch(createCellAppend(type));
+      this.props.dispatch(createCellAppend(type));
       return;
     }
 
     if (this.props.above) {
-      this.context.dispatch(createCellBefore(type, this.props.id));
+      this.props.dispatch(createCellBefore(type, this.props.id));
     } else {
-      this.context.dispatch(createCellAfter(type, this.props.id));
+      this.props.dispatch(createCellAfter(type, this.props.id));
     }
   }
 
   mergeCell() {
-    this.context.dispatch(mergeCellAfter(this.props.id));
+    this.props.dispatch(mergeCellAfter(this.props.id));
   }
 
   render() {
     const mergeButton = (
       <button onClick={this.mergeCell} title="merge cells">
-        <i className="material-icons" style={{ transform: 'rotate(90deg)' }}>
-          compare_arrows
-        </i>
+        <span className="octicon octicon-arrow-up" />
       </button>);
     return (
-      <div className="creator-tool">
+      <div className="cell-creator">
         <button onClick={this.createTextCell} title="create text cell" className="add-text-cell">
-          <i className="material-icons">art_track</i>
+          <span className="octicon octicon-markdown" />
         </button>
-        <span className="creator-label">Add cell</span>
         <button onClick={this.createCodeCell} title="create code cell" className="add-code-cell">
-          <i className="material-icons">code</i>
+          <span className="octicon octicon-code" />
         </button>
         {this.props.above ? null : mergeButton}
       </div>
@@ -67,3 +64,5 @@ export default class CellCreatorButtons extends React.Component {
   }
 
 }
+
+export default connect()(CellCreatorButtons);

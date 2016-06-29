@@ -1,7 +1,10 @@
-import appReducer from './app';
-import documentReducer from './document';
+import app from './app';
+import document from './document';
+import metadata from './metadata';
+import { combineReducers } from 'redux';
 
-export const reducers = {
-  ...appReducer,
-  ...documentReducer,
-};
+export default combineReducers({
+  app,
+  metadata,
+  document,
+});
