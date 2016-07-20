@@ -345,3 +345,39 @@ describe('executeCell', () => {
     actions.executeCell(channels, id, source, true, undefined)(subject);
   });
 });
+
+describe('splitCell', () => {
+  it('creates a SPLIT_CELL action', () => {
+    expect(actions.splitCell('235', 0)).to.deep.equal({
+      type: constants.SPLIT_CELL,
+      id: '235',
+      position: 0,
+    });
+  });
+});
+
+describe('copyCell', () => {
+  it('creates a COPY_CELL action', () => {
+    expect(actions.copyCell('235')).to.deep.equal({
+      type: constants.COPY_CELL,
+      id: '235',
+    });
+  });
+});
+
+describe('changeOutputVisibility', () => {
+  it('creates a CHANGE_OUTPUT_VISIBILITY', () => {
+    expect(actions.changeOutputVisibility('235')).to.deep.equal({
+      type: constants.CHANGE_OUTPUT_VISIBILITY,
+      id: '235',
+    });
+  });
+});
+
+describe('pasteCell', () => {
+  it('creates a PASTE_CELL action', () => {
+    expect(actions.pasteCell()).to.deep.equal({
+      type:constants.PASTE_CELL,
+    });
+  });
+});

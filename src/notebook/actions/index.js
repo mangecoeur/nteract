@@ -184,6 +184,13 @@ export function clearCellOutput(id) {
   };
 }
 
+export function changeOutputVisibility(id) {
+  return {
+    type: constants.CHANGE_OUTPUT_VISIBILITY,
+    id,
+  };
+}
+
 export function updateCellPagers(id, pagers) {
   return {
     type: constants.UPDATE_CELL_PAGERS,
@@ -255,6 +262,14 @@ export function executeCell(channels, id, source, kernelConnected, notificationS
   });
 }
 
+export function splitCell(id, position) {
+  return {
+    type: constants.SPLIT_CELL,
+    id,
+    position,
+  };
+}
+
 export function overwriteMetadata(field, value) {
   return {
     type: constants.OVERWRITE_METADATA_FIELD,
@@ -313,5 +328,18 @@ export function updateDocument(newDocument) {
   return {
     type: constants.UPDATE_DOCUMENT,
     newDocument,
+  };
+}
+
+export function copyCell(id) {
+  return {
+    type: constants.COPY_CELL,
+    id,
+  };
+}
+
+export function pasteCell() {
+  return {
+    type: constants.PASTE_CELL,
   };
 }

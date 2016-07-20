@@ -22,7 +22,8 @@ import {
 } from 'immutable';
 
 const initialDocument = new Map();
-const monocellDocument = initialDocument.set('notebook', commutable.appendCell(dummyCommutable, commutable.emptyCodeCell));
+const monocellDocument = initialDocument
+  .set('notebook', commutable.appendCell(dummyCommutable, commutable.emptyCodeCell));
 
 describe('setNotebook', () => {
   it('converts a JSON notebook to our commutable notebook and puts in state', () => {
@@ -332,4 +333,91 @@ describe('updateDocument', () => {
     const state = reducers(originalState, action);
     expect(state.document).to.equal(monocellDocument);
   }); 
+});
+
+describe('splitCell', () => {
+  it('splits a notebook cell into two', () => {
+    const originalState = {
+      document: monocellDocument,
+    };
+
+    const id = originalState.document.getIn(['notebook', 'cellOrder']).first();
+
+    const action = {
+      type: constants.SPLIT_CELL,
+      id: id,
+      position: 0,
+    };
+    
+    const state = reducers(originalState, action);
+    expect(state.document.getIn(['notebook', 'cellOrder']).size).to.equal(4);
+  });
+});
+
+describe('changeOutputVisibility', () => {
+  it('changes the visibility on a single cell', () => {
+    let outputStatuses = new Map();
+    monocellDocument.getIn(['notebook', 'cellOrder']).map((cellID) => {
+      outputStatuses = outputStatuses.setIn([cellID, 'isHidden'], false);
+      return outputStatuses;
+    });
+    const docWithOutputStatuses = monocellDocument.set('outputStatuses', outputStatuses);
+
+    const originalState = {
+      document: docWithOutputStatuses,
+    };
+
+    const id = originalState.document.getIn(['notebook', 'cellOrder']).first();
+
+    const action = {
+      type: constants.CHANGE_OUTPUT_VISIBILITY,
+      id: id,
+    };
+
+    const state = reducers(originalState, action);
+    expect(state.document.getIn(['outputStatuses', id, 'isHidden'])).to.be.true;
+  });
+});
+
+describe('copyCell', () => {
+  it('copies a cell', () => {
+    const originalState = {
+      document: monocellDocument,
+    };
+
+    const id = originalState.document.getIn(['notebook', 'cellOrder']).first();
+    const cell = originalState.document.getIn(['notebook', 'cellMap', id]);
+
+    const action = {
+      type: constants.COPY_CELL,
+      id: id,
+    };
+
+    const state = reducers(originalState, action);
+    expect(state.document.getIn(['copied', 'cell'])).to.equal(cell);
+    expect(state.document.getIn(['copied', 'id'])).to.equal(id);
+  });
+});
+
+describe('pasteCell', () => {
+  it('pastes a cell', () => {
+    const id = monocellDocument.getIn(['notebook', 'cellOrder']).first();
+    const cell = monocellDocument.getIn(['notebook', 'cellMap', id]);
+
+    const originalState = {
+      document: monocellDocument.set('copied', new Map({cell, id})),
+    };
+
+    const action = {
+      type: constants.PASTE_CELL,
+    };
+
+    const state = reducers(originalState, action);
+    const copiedId = state.document.getIn(['notebook', 'cellOrder', 1]);
+
+    expect(state.document.getIn(['notebook', 'cellOrder']).size).to.equal(4);
+    expect(copiedId).to.not.equal(id);
+    expect(state.document.getIn(['notebook', 'cellMap', copiedId, 'source']))
+      .to.equal(cell.get('source'));
+  });
 });

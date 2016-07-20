@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import PureRenderMixin from 'react-addons-pure-render-mixin';
+import { ContextMenuLayer as contextMenuLayer } from 'react-contextmenu';
 
 import Immutable from 'immutable';
 
@@ -8,12 +9,19 @@ import CodeCell from './code-cell';
 import MarkdownCell from './markdown-cell';
 import Toolbar from './toolbar';
 
-import { focusCell, focusPreviousCell, focusNextCell } from '../../actions';
+import {
+  focusCell,
+  focusPreviousCell,
+  focusNextCell,
+  copyCell,
+  pasteCell,
+} from '../../actions';
 
-class Cell extends React.Component {
+export class Cell extends React.Component {
   static propTypes = {
     cell: React.PropTypes.any,
     displayOrder: React.PropTypes.instanceOf(Immutable.List),
+    outputStatus: React.PropTypes.instanceOf(Immutable.Map),
     id: React.PropTypes.string,
     getCompletions: React.PropTypes.func,
     focusedCell: React.PropTypes.string,
@@ -37,11 +45,16 @@ class Cell extends React.Component {
     this.focusBelowCell = this.focusBelowCell.bind(this);
     this.setCellHoverState = this.setCellHoverState.bind(this);
     this.setToolbarHoverState = this.setToolbarHoverState.bind(this);
+    this.handleKeyDown = this.handleKeyDown.bind(this);
+    this.handleKeyUp = this.handleKeyUp.bind(this);
+    this.copyCell = this.copyCell.bind(this);
+    this.pasteCell = this.pasteCell.bind(this);
   }
 
   state = {
     hoverCell: false,
     hoverToolbar: false,
+    ctrlDown: false,
   };
 
   componentWillMount() {
@@ -74,6 +87,24 @@ class Cell extends React.Component {
     this.setState({ hoverToolbar });
   }
 
+  handleKeyDown(event) {
+    if (event.ctrlKey || event.keyCode === 91) {
+      this.setState({ ctrlDown: true });
+    }
+  }
+
+  handleKeyUp(event) {
+    if (this.state.ctrlDown) {
+      if (event.keyCode === 86) {
+        this.setState({ ctrlDown: false });
+        this.pasteCell();
+      } else if (event.keyCode === 67) {
+        this.setState({ ctrlDown: false });
+        this.copyCell();
+      }
+    }
+  }
+
   selectCell() {
     this.context.store.dispatch(focusCell(this.props.id));
   }
@@ -86,6 +117,14 @@ class Cell extends React.Component {
     this.context.store.dispatch(focusNextCell(this.props.id));
   }
 
+  copyCell() {
+    this.context.store.dispatch(copyCell(this.props.id));
+  }
+
+  pasteCell() {
+    this.context.store.dispatch(pasteCell());
+  }
+
   render() {
     const cell = this.props.cell;
     const type = cell.get('cell_type');
@@ -94,7 +133,10 @@ class Cell extends React.Component {
       <div
         className={`cell ${type === 'markdown' ? 'text' : 'code'} ${focused ? 'focused' : ''}`}
         onClick={this.selectCell}
+        onKeyDown={this.handleKeyDown}
+        onKeyUp={this.handleKeyUp}
         ref="cell"
+        onContextMenu={this.contextMenu}
       >
         {
           this.state.hoverCell || this.state.hoverToolbar ? <Toolbar
@@ -123,6 +165,7 @@ class Cell extends React.Component {
             theme={this.props.theme}
             language={this.props.language}
             displayOrder={this.props.displayOrder}
+            outputStatus={this.props.outputStatus}
             transforms={this.props.transforms}
             pagers={this.props.pagers}
             running={this.props.running}
@@ -134,4 +177,6 @@ class Cell extends React.Component {
   }
 }
 
-export default Cell;
+export default contextMenuLayer('cell-context-menu', (props) => ({
+  id: props.id,
+}))(Cell);

@@ -6,6 +6,7 @@ import { findDOMNode } from 'react-dom';
 import Immutable from 'immutable';
 
 import Cell from './cell';
+import CellContextMenu from './cell-context-menu';
 import { focusCell } from '../../actions';
 
 const cellSource = {
@@ -82,7 +83,7 @@ class DraggableCell extends React.Component {
 
   componentDidMount() {
     const connectDragPreview = this.props.connectDragPreview;
-    const img = new Image();
+    const img = new window.Image();
     img.src = [
       'data:image/png;base64,',
       'iVBORw0KGgoAAAANSUhEUgAAADsAAAAzCAYAAAApdnDeAAAAAXNSR0IArs4c6QAA',
@@ -133,9 +134,10 @@ class DraggableCell extends React.Component {
             />
           )
         }
-        {
+        <div>
           <Cell {...this.props} />
-        }
+          <CellContextMenu id={this.props.id} />
+        </div>
       </div>
     );
   }

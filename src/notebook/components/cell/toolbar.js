@@ -3,7 +3,13 @@ import ReactDOM from 'react-dom';
 import { connect } from 'react-redux';
 import PureRenderMixin from 'react-addons-pure-render-mixin';
 
-import { executeCell, removeCell, toggleStickyCell, clearCellOutput } from '../../actions';
+import { executeCell,
+  removeCell,
+  toggleStickyCell,
+  clearCellOutput,
+  splitCell,
+  changeOutputVisibility,
+} from '../../actions';
 
 const mapStateToProps = (state) => ({
   channels: state.app.channels,
@@ -34,8 +40,10 @@ export class Toolbar extends React.Component {
     this.removeCell = this.removeCell.bind(this);
     this.executeCell = this.executeCell.bind(this);
     this.clearCellOutput = this.clearCellOutput.bind(this);
+    this.splitCell = this.splitCell.bind(this);
     this.setHoverState = this.setHoverState.bind(this);
     this.toggleStickyCell = this.toggleStickyCell.bind(this);
+    this.changeOutputVisibility = this.changeOutputVisibility.bind(this);
   }
 
   componentWillMount() {
@@ -88,6 +96,14 @@ export class Toolbar extends React.Component {
     this.context.store.dispatch(clearCellOutput(this.props.id));
   }
 
+  splitCell() {
+    this.context.store.dispatch(splitCell(this.props.id, 0));
+  }
+
+  changeOutputVisibility() {
+    this.context.store.dispatch(changeOutputVisibility(this.props.id));
+  }
+
   render() {
     const showPlay = this.props.type !== 'markdown';
     return (
@@ -101,9 +117,15 @@ export class Toolbar extends React.Component {
               <button onClick={this.clearCellOutput}>
                 <span className="octicon octicon-zap" />
               </button>
+              <button onClick={this.changeOutputVisibility}>
+                <span className="octicon octicon-eye" />
+              </button>
             </span>}
           <button onClick={this.removeCell}>
             <span className="octicon octicon-trashcan" />
+          </button>
+          <button onClick={this.splitCell}>
+            <span className="octicon octicon-unfold" />
           </button>
           <button onClick={this.toggleStickyCell}>
             <span className="octicon octicon-pin" />
