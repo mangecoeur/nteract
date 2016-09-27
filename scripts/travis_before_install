@@ -1,0 +1,8 @@
+if [ "${GROUP}" == "lint" ]; then
+  echo "skipping mega-install"
+  return
+fi
+
+pip install jupyter_console --user
+pip install ipywidgets --user
+jupyter kernelspec install-self --user

@@ -12,14 +12,25 @@ const sharedProps = { displayOrder, transforms };
 describe('CodeCell', () => {
   it('can be rendered', () => {
     const cell = shallow(
-      <CodeCell cell={commutable.emptyCodeCell} {...sharedProps} outputStatus={Immutable.Map({'isHidden': false})}/>
+      <CodeCell cell={commutable.emptyCodeCell} {...sharedProps}
+      cellStatus={Immutable.Map({'outputHidden': false, 'inputHidden': false})}/>
     );
     expect(cell).to.not.be.null;
   });
   it('creates an editor', () => {
     const cell = mount(
-      <CodeCell cell={commutable.emptyCodeCell} {...sharedProps} outputStatus={Immutable.Map({'isHidden': false})}/>
+      <CodeCell cell={commutable.emptyCodeCell} {...sharedProps}
+      cellStatus={Immutable.Map({'outputHidden': false, 'inputHidden': false})}/>
     );
     expect(cell.find('.input').length).to.be.greaterThan(0);
   });
+  it('creates a pager', () => {
+    const cell = mount(
+      <CodeCell cell={commutable.emptyCodeCell} {...sharedProps}
+      cellStatus={Immutable.Map({'outputHidden': false, 'inputHidden': false})}
+      pagers={Immutable.fromJS([{'data': {'text/plain': 'one'}}])} />
+    );
+    expect(cell.find('.pagers').length).to.be.greaterThan(0);
+  });
+
 });

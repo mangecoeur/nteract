@@ -1,2 +1,2 @@
-// NOTE: This must remain ES5 code.
-require('./build/main');
+// Necessary for bootstrapping electron, must be ES5
+require('./build/main/index.js')

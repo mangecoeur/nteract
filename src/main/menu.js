@@ -1,10 +1,10 @@
-import { dialog, app, shell, Menu } from 'electron';
+import { dialog, app, shell, Menu, ipcMain as ipc,
+         BrowserWindow } from 'electron';
+import * as path from 'path';
+
+import { launch, launchNewNotebook } from './launch';
 
 const kernelspecs = require('kernelspecs');
-
-import { launchFilename, launchNewNotebook } from './launch';
-
-import * as path from 'path';
 
 function send(focusedWindow, eventName, obj) {
   if (!focusedWindow) {
@@ -18,6 +18,27 @@ function createSender(eventName, obj) {
   return (item, focusedWindow) => {
     send(focusedWindow, eventName, obj);
   };
+}
+
+export function githubAuth(item, focusedWindow) {
+  const win = new BrowserWindow({ show: false,
+                                  webPreferences: { zoomFactor: 0.75 } });
+  win.webContents.on('dom-ready', () => {
+    if (win.getURL().indexOf('callback?code=') !== -1) {
+      win.webContents.executeJavaScript(`
+        require('electron').ipcRenderer.send('auth', document.body.textContent);
+        `);
+      ipc.on('auth', (event, auth) => {
+        const authorization = JSON.parse(auth);
+        send(focusedWindow, 'menu:publish:auth', authorization.access_token);
+        win.close();
+        return;
+      });
+    } else {
+      win.show();
+    }
+  });
+  win.loadURL('https://nteract-oauth.now.sh/github');
 }
 
 export const fileSubMenus = {
@@ -36,12 +57,11 @@ export const fileSubMenus = {
         properties: [
           'openFile',
         ],
-        // TODO: This should be based on the currently opened notebook
-        defaultPath: process.cwd(),
+        defaultPath: app.getPath('home'),
       };
       dialog.showOpenDialog(opts, (fname) => {
         if (fname) {
-          launchFilename(fname[0]);
+          launch(fname[0]);
         }
       });
     },
@@ -58,6 +78,7 @@ export const fileSubMenus = {
       const opts = {
         title: 'Save Notebook As',
         filters: [{ name: 'Notebooks', extensions: ['ipynb'] }],
+        defaultPath: app.getPath('home'),
       };
       dialog.showSaveDialog(opts, (filename) => {
         if (!filename) {
@@ -70,9 +91,18 @@ export const fileSubMenus = {
     },
     accelerator: 'CmdOrCtrl+Shift+S',
   },
-  duplicate: {
-    label: '&Duplicate Notebook',
-    click: createSender('menu:duplicate-notebook'),
+  publish: {
+    label: '&Publish',
+    submenu: [
+      {
+        label: '&Authenticate',
+        click: githubAuth,
+      },
+      {
+        label: '&Publish To Gist',
+        click: createSender('menu:publish:gist'),
+      },
+    ],
   },
 };
 
@@ -83,25 +113,13 @@ export const file = {
     fileSubMenus.open,
     fileSubMenus.save,
     fileSubMenus.saveAs,
+    fileSubMenus.publish,
   ],
 };
 
 export const edit = {
   label: 'Edit',
   submenu: [
-    {
-      label: 'Undo',
-      accelerator: 'CmdOrCtrl+Z',
-      click: createSender('menu:undo'),
-    },
-    {
-      label: 'Redo',
-      accelerator: 'Shift+CmdOrCtrl+Z',
-      click: createSender('menu:redo'),
-    },
-    {
-      type: 'separator',
-    },
     {
       label: 'Cut',
       accelerator: 'CmdOrCtrl+X',
@@ -121,6 +139,29 @@ export const edit = {
       label: 'Select All',
       accelerator: 'CmdOrCtrl+A',
       role: 'selectall',
+    },
+    {
+      type: 'separator',
+    },
+    {
+      label: 'New Code Cell',
+      accelerator: 'CmdOrCtrl+Shift+N',
+      click: createSender('menu:new-code-cell'),
+    },
+    {
+      label: 'Copy Cell',
+      accelerator: 'CmdOrCtrl+Shift+C',
+      click: createSender('menu:copy-cell'),
+    },
+    {
+      label: 'Cut Cell',
+      accelerator: 'CmdOrCtrl+Shift+X',
+      click: createSender('menu:cut-cell'),
+    },
+    {
+      label: 'Paste Cell',
+      accelerator: 'CmdOrCtrl+Shift+V',
+      click: createSender('menu:paste-cell'),
     },
   ],
 };
@@ -228,16 +269,6 @@ export const view = {
 };
 
 
-export const publish = {
-  label: 'Publish',
-  submenu: [
-    {
-      label: 'to Gist...',
-      click: createSender('menu:publish:gist'),
-    },
-  ],
-};
-
 const windowDraft = {
   label: 'Window',
   role: 'window',
@@ -336,7 +367,6 @@ export function generateDefaultTemplate() {
   template.push(file);
   template.push(edit);
   template.push(view);
-  template.push(publish);
   template.push(window);
   template.push(help);
 
@@ -346,7 +376,7 @@ export function generateDefaultTemplate() {
 export const defaultMenu = Menu.buildFromTemplate(generateDefaultTemplate());
 
 export function loadFullMenu() {
-  return kernelspecs.findAll().then(kernelSpecs => {
+  return kernelspecs.findAll().then((kernelSpecs) => {
     function generateSubMenu(kernelName) {
       return {
         label: kernelSpecs[kernelName].spec.display_name,
@@ -356,13 +386,11 @@ export function loadFullMenu() {
 
     const kernelMenuItems = Object.keys(kernelSpecs).map(generateSubMenu);
 
-    const newNotebookItems = Object.keys(kernelSpecs).map(kernelName => {
-      const kernelSpec = kernelSpecs[kernelName];
-      return {
+    const newNotebookItems = Object.keys(kernelSpecs)
+      .map(kernelName => ({
         label: kernelSpecs[kernelName].spec.display_name,
-        click: () => launchNewNotebook(kernelSpec),
-      };
-    });
+        click: () => launchNewNotebook(kernelName),
+      }));
 
     const languageMenu = {
       label: '&Language',
@@ -390,6 +418,7 @@ export function loadFullMenu() {
         ...kernelMenuItems,
       ],
     };
+
     const template = [];
 
     if (process.platform === 'darwin') {
@@ -401,14 +430,12 @@ export function loadFullMenu() {
       submenu: [
         {
           label: '&New',
-          submenu: [
-            ...newNotebookItems,
-          ],
+          submenu: newNotebookItems,
         },
         fileSubMenus.open,
         fileSubMenus.save,
         fileSubMenus.saveAs,
-        fileSubMenus.duplicate,
+        fileSubMenus.publish,
       ],
     };
 
@@ -419,7 +446,6 @@ export function loadFullMenu() {
 
     // Application specific functionality should go before window and help
     template.push(languageMenu);
-    template.push(publish);
     template.push(window);
     template.push(help);
 

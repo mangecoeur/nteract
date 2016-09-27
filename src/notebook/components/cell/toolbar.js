@@ -1,33 +1,25 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { connect } from 'react-redux';
-import PureRenderMixin from 'react-addons-pure-render-mixin';
+/* eslint class-methods-use-this: 0 */
 
-import { executeCell,
+import React from 'react';
+import PureRenderMixin from 'react-addons-pure-render-mixin';
+import Dropdown, { DropdownTrigger, DropdownContent } from 'react-simple-dropdown';
+
+import { executeCell } from '../../epics/execute';
+
+import {
   removeCell,
   toggleStickyCell,
   clearCellOutput,
-  splitCell,
   changeOutputVisibility,
+  changeInputVisibility,
+  changeCellType,
 } from '../../actions';
 
-const mapStateToProps = (state) => ({
-  channels: state.app.channels,
-  notificationSystem: state.app.notificationSystem,
-  kernelConnected: state.app.channels &&
-    !(state.app.executionState === 'starting' ||
-      state.app.executionState === 'not connected'),
-});
-
-export class Toolbar extends React.Component {
+export default class Toolbar extends React.Component {
   static propTypes = {
     cell: React.PropTypes.any,
-    channels: React.PropTypes.object,
     id: React.PropTypes.string,
-    kernelConnected: React.PropTypes.bool,
-    notificationSystem: React.PropTypes.any,
     type: React.PropTypes.string,
-    setHoverState: React.PropTypes.func,
   };
 
   static contextTypes = {
@@ -40,40 +32,14 @@ export class Toolbar extends React.Component {
     this.removeCell = this.removeCell.bind(this);
     this.executeCell = this.executeCell.bind(this);
     this.clearCellOutput = this.clearCellOutput.bind(this);
-    this.splitCell = this.splitCell.bind(this);
-    this.setHoverState = this.setHoverState.bind(this);
     this.toggleStickyCell = this.toggleStickyCell.bind(this);
+    this.changeInputVisibility = this.changeInputVisibility.bind(this);
     this.changeOutputVisibility = this.changeOutputVisibility.bind(this);
-  }
-
-  componentWillMount() {
-    // Listen to the page level mouse move event and manually check for
-    // intersection because we don't want the hover region to actually capture
-    // any mouse events.  The hover region is an invisible element that
-    // describes the "hot region" that toggles the creator buttons.
-    document.addEventListener('mousemove', this.setHoverState, false);
+    this.changeCellType = this.changeCellType.bind(this);
   }
 
   shouldComponentUpdate() {
     return false;
-  }
-
-  componentWillUnmount() {
-    document.removeEventListener('mousemove', this.setHoverState);
-  }
-
-  setHoverState(mouseEvent) {
-    if (this.refs.mask) {
-      const mask = ReactDOM.findDOMNode(this.refs.mask);
-      if (mask) {
-        const x = mouseEvent.clientX;
-        const y = mouseEvent.clientY;
-        const regionRect = mask.getBoundingClientRect();
-        const hover = (regionRect.left < x && x < regionRect.right) &&
-                     (regionRect.top < y && y < regionRect.bottom);
-        this.props.setHoverState(hover);
-      }
-    }
   }
 
   toggleStickyCell() {
@@ -85,23 +51,30 @@ export class Toolbar extends React.Component {
   }
 
   executeCell() {
-    this.context.store.dispatch(executeCell(this.props.channels,
+    this.context.store.dispatch(executeCell(
                                       this.props.id,
-                                      this.props.cell.get('source'),
-                                      this.props.kernelConnected,
-                                      this.props.notificationSystem));
+                                      this.props.cell.get('source')));
   }
 
   clearCellOutput() {
+    this.refs.dropdown.hide();
     this.context.store.dispatch(clearCellOutput(this.props.id));
   }
 
-  splitCell() {
-    this.context.store.dispatch(splitCell(this.props.id, 0));
+  changeInputVisibility() {
+    this.refs.dropdown.hide();
+    this.context.store.dispatch(changeInputVisibility(this.props.id));
   }
 
   changeOutputVisibility() {
+    this.refs.dropdown.hide();
     this.context.store.dispatch(changeOutputVisibility(this.props.id));
+  }
+
+  changeCellType() {
+    this.refs.dropdown.hide();
+    const to = this.props.type === 'markdown' ? 'code' : 'markdown';
+    this.context.store.dispatch(changeCellType(this.props.id, to));
   }
 
   render() {
@@ -111,29 +84,48 @@ export class Toolbar extends React.Component {
         <div className="cell-toolbar">
           {showPlay &&
             <span>
-              <button onClick={this.executeCell}>
+              <button onClick={this.executeCell} className="executeButton" >
                 <span className="octicon octicon-triangle-right" />
               </button>
-              <button onClick={this.clearCellOutput}>
-                <span className="octicon octicon-zap" />
-              </button>
-              <button onClick={this.changeOutputVisibility}>
-                <span className="octicon octicon-eye" />
-              </button>
             </span>}
-          <button onClick={this.removeCell}>
+          <button onClick={this.removeCell} className="deleteButton" >
             <span className="octicon octicon-trashcan" />
           </button>
-          <button onClick={this.splitCell}>
-            <span className="octicon octicon-unfold" />
-          </button>
-          <button onClick={this.toggleStickyCell}>
+          <button onClick={this.toggleStickyCell} className="stickyButton" >
             <span className="octicon octicon-pin" />
           </button>
+          <Dropdown ref="dropdown">
+            <DropdownTrigger>
+              <button>
+                <span className="octicon octicon-chevron-down" />
+              </button>
+            </DropdownTrigger>
+            <DropdownContent ref="DropdownContent">
+              {
+              (this.props.type === 'code') ?
+                <ul>
+                  <li onClick={this.clearCellOutput} className="clearOutput" >
+                    <a>Clear Cell Output</a>
+                  </li>
+                  <li onClick={this.changeInputVisibility} className="inputVisibility" >
+                    <a>Toggle Input Visibility</a>
+                  </li>
+                  <li onClick={this.changeOutputVisibility} className="outputVisibility" >
+                    <a>Toggle Output Visibility</a>
+                  </li>
+                </ul> : null
+              }
+              <ul>
+                <li onClick={this.changeCellType} className="changeType" >
+                  <a>
+                    Convert to {this.props.type === 'markdown' ? 'Code' : 'Markdown'} Cell
+                  </a>
+                </li>
+              </ul>
+            </DropdownContent>
+          </Dropdown>
         </div>
       </div>
     );
   }
 }
-
-export default connect(mapStateToProps)(Toolbar);

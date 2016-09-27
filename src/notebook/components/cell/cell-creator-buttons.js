@@ -1,3 +1,5 @@
+/* eslint class-methods-use-this: 0 */
+
 import React from 'react';
 import PureRenderMixin from 'react-addons-pure-render-mixin';
 import { connect } from 'react-redux';
@@ -6,13 +8,17 @@ import {
   createCellAfter,
   createCellBefore,
   createCellAppend,
-  mergeCellAfter } from '../../actions';
+  mergeCellAfter,
+} from '../../actions';
 
 export class CellCreatorButtons extends React.Component {
   static propTypes = {
     above: React.PropTypes.bool,
     id: React.PropTypes.string,
-    dispatch: React.PropTypes.func,
+  };
+
+  static contextTypes = {
+    store: React.PropTypes.object,
   };
 
   constructor() {
@@ -30,19 +36,19 @@ export class CellCreatorButtons extends React.Component {
 
   createCell(type) {
     if (!this.props.id) {
-      this.props.dispatch(createCellAppend(type));
+      this.context.store.dispatch(createCellAppend(type));
       return;
     }
 
     if (this.props.above) {
-      this.props.dispatch(createCellBefore(type, this.props.id));
+      this.context.store.dispatch(createCellBefore(type, this.props.id));
     } else {
-      this.props.dispatch(createCellAfter(type, this.props.id));
+      this.context.store.dispatch(createCellAfter(type, this.props.id));
     }
   }
 
   mergeCell() {
-    this.props.dispatch(mergeCellAfter(this.props.id));
+    this.context.store.dispatch(mergeCellAfter(this.props.id));
   }
 
   render() {

@@ -2,9 +2,13 @@ import React from 'react';
 import Immutable from 'immutable';
 
 import { mount } from 'enzyme';
-import {expect} from 'chai';
+import chai, { expect } from 'chai';
 import { dummyStore } from '../../../utils'
+
 import sinon from 'sinon';
+import sinonChai from 'sinon-chai';
+
+chai.use(sinonChai);
 
 import { Cell } from '../../../../src/notebook/components/cell/cell';
 import * as commutable from 'commutable';
@@ -13,62 +17,57 @@ import { displayOrder, transforms } from 'transformime-react';
 const sharedProps = { displayOrder, transforms };
 describe('Cell', () => {
   it('should be able to render a markdown cell', () => {
+    const store = dummyStore();
     const cell = mount(
-      <Cell cell={commutable.emptyMarkdownCell} {...sharedProps}/>
+      <Cell cell={commutable.emptyMarkdownCell} {...sharedProps} />,
+      {
+        context: { store }
+      }
     );
     expect(cell).to.not.be.null;
     expect(cell.find('div.cell.text').length).to.be.greaterThan(0);
   });
   it('should be able to render a code cell', () => {
+    const store = dummyStore();
     const cell = mount(
-      <Cell cell={commutable.emptyCodeCell} {...sharedProps} outputStatus={Immutable.Map({'isHidden': false})}/>
+      <Cell cell={commutable.emptyCodeCell} {...sharedProps}
+      cellStatus={Immutable.Map({'outputHidden': false, 'inputHidden': false})}/>,
+      {
+        context: { store }
+      }
     );
     expect(cell).to.not.be.null;
     expect(cell.find('div.code.cell').length).to.be.greaterThan(0);
   });
-  it('setCellHoverState does not error', () => {
+  it('dispatches cell actions', () => {
+    const store = dummyStore();
     const cell = mount(
-      <Cell cell={commutable.emptyCodeCell} {...sharedProps} outputStatus={Immutable.Map({'isHidden': false})}/>
+      <Cell cell={commutable.emptyMarkdownCell} {...sharedProps} />,
+      {
+        context: { store }
+      }
     );
 
-    expect(() => cell.instance().setCellHoverState({
-      clientX: 0,
-      clientY: 0,
-    })).to.not.throw(Error);
-  });
-  it('handleKeyDown sets ctrlDown properly', () => {
-    const cell = mount(
-      <Cell cell={commutable.emptyCodeCell} {...sharedProps} outputStatus={Immutable.Map({'isHidden': false})}/>
-    );
+    store.dispatch = sinon.spy();
+    const inst = cell.instance();
 
-    expect(cell.state('ctrlDown')).to.be.false;
-    cell.simulate('keydown', { key: 'Ctrl', ctrlKey: true });
-    expect(cell.state('ctrlDown')).to.be.true;
-  });
-  it('handleKeyUp responds properly to Ctrl + C', () => {
-    const cell = mount(
-      <Cell cell={commutable.emptyCodeCell} {...sharedProps} outputStatus={Immutable.Map({'isHidden': false})}/>,
-      { context: { store: dummyStore() } }
-    );
+    inst.selectCell();
+    expect(store.dispatch.firstCall).to.have.been.calledWith({
+      type: 'FOCUS_CELL',
+      id: undefined,
+    });
 
-    const spy = sinon.spy(cell.instance(), "copyCell"); 
+    inst.focusAboveCell();
+    expect(store.dispatch.secondCall).to.have.been.calledWith({
+      type: 'FOCUS_PREVIOUS_CELL',
+      id: undefined,
+    });
 
-    cell.simulate('keydown', { key: 'Ctrl', ctrlKey: true});
-    cell.simulate('keyup', { keyCode: 67 });
-    expect(cell.state('ctrlDown')).to.be.false;
-    expect(spy.called).to.be.true;
-  });
-  it('handleKeyUp responds properly to Ctrl + V', () => {
-    const cell = mount(
-      <Cell cell={commutable.emptyCodeCell} {...sharedProps} outputStatus={Immutable.Map({'isHidden': false})}/>,
-      { context: { store: dummyStore() } }
-    );
-
-    const spy = sinon.spy(cell.instance(), "pasteCell"); 
-
-    cell.simulate('keydown', { key: 'Ctrl', ctrlKey: true});
-    cell.simulate('keyup', { keyCode: 86 });
-    expect(cell.state('ctrlDown')).to.be.false;
-    expect(spy.called).to.be.true;
+    inst.focusBelowCell();
+    expect(store.dispatch.thirdCall).to.have.been.calledWith({
+      type: 'FOCUS_NEXT_CELL',
+      id: undefined,
+      createCellIfUndefined: true,
+    });
   });
 });

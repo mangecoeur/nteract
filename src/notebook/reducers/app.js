@@ -1,9 +1,12 @@
-import * as constants from '../constants';
 import { handleActions } from 'redux-actions';
+
+import * as constants from '../constants';
 
 import {
   shutdownKernel,
-} from '../api/kernel';
+} from '../kernel/shutdown';
+
+const Github = require('github');
 
 function cleanupKernel(state) {
   const kernel = {
@@ -15,10 +18,10 @@ function cleanupKernel(state) {
 
   return state.withMutations(ctx =>
     ctx.set('channels', null)
-       .set('spawn', null)
-       .set('connectionFile', null)
-       .set('kernelSpecName', null)
-       .set('executionState', 'not connected')
+      .set('spawn', null)
+      .set('connectionFile', null)
+      .set('kernelSpecName', null)
+      .set('executionState', 'not connected')
   );
 }
 
@@ -27,10 +30,10 @@ export default handleActions({
     return cleanupKernel(state)
       .withMutations(ctx =>
         ctx.set('channels', action.channels)
-           .set('connectionFile', action.connectionFile)
-           .set('spawn', action.spawn)
-           .set('kernelSpecName', action.kernelSpecName)
-           .set('executionState', 'starting')
+          .set('connectionFile', action.connectionFile)
+          .set('spawn', action.spawn)
+          .set('kernelSpecName', action.kernelSpecName)
+          .set('executionState', 'starting')
     );
   },
   [constants.EXIT]: function exit(state) {
@@ -51,9 +54,19 @@ export default handleActions({
     return state.set('executionState', action.executionState);
   },
   [constants.DONE_SAVING]: function doneSaving(state) {
-    return state.set('isSaving', false);
+    return state.set('isSaving', false)
+                .set('lastSaved', new Date());
   },
   [constants.SET_NOTIFICATION_SYSTEM]: function setNotificationsSystem(state, action) {
     return state.set('notificationSystem', action.notificationSystem);
   },
+  [constants.SET_THEME]: function setTheme(state, action) {
+    return state.set('theme', action.theme);
+  },
+  [constants.SET_GITHUB_TOKEN]: function setGithubToken(state, action) {
+    const { githubToken } = action;
+    const github = new Github();
+    github.authenticate({ type: 'oauth', token: githubToken }); // synchronous, returns immediately
+    return state.set('github', github);
+  }
 }, {});

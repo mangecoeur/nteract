@@ -4,7 +4,7 @@ var jsdom = require('jsdom').jsdom;
 
 var exposedProperties = ['window', 'navigator', 'document'];
 
-global.document = jsdom('');
+global.document = jsdom('<html><body><div id="app"></div></html>');
 global.window = document.defaultView;
 Object.keys(document.defaultView).forEach((property) => {
   if (typeof global[property] === 'undefined') {
@@ -27,6 +27,91 @@ global.window.document.createRange = function createRange() {
     setStart: () => {},
     getBoundingClientRect: () => {
       return { right: 0 };
+    },
+    getClientRects: () => {
+      return []
     }
   }
 };
+
+// Mocks for tests
+var mock = require('mock-require');
+mock('electron-json-storage', {
+  'get': function(key, callback){
+    callback(null, { theme: 'light' });
+  },
+  'set': function(key, json, callback) {
+    if (!json && !key) {
+      callback(new Error('Must provide JSON and key'));
+    }
+
+    callback(null);
+  },
+})
+
+mock('plotly.js/dist/plotly', {
+  'newPlot': function(data, layout, config) {},
+})
+
+mock('electron', {
+  'shell': {
+    'openExternal': function(url) { },
+  },
+  'remote': {
+    'require': function(module) {
+      if (module === 'electron') {
+        return {
+          'dialog': {
+            'showSaveDialog': function(config) { },
+          }
+        };
+      }
+    },
+    'BrowserWindow': {
+      'getFocusedWindow': function() {
+        return {
+          'setTitle': function() {},
+        };
+      }
+    },
+    'getCurrentWindow': function() {
+      return {
+        'setTitle': function(){},
+        'setDocumentEdited': function(){},
+        'setRepresentedFilename': function() {},
+      };
+    }
+  },
+  'webFrame': {
+    'setZoomLevel': function(zoom) { },
+    'getZoomLevel': function() { return 1; },
+  },
+  'ipcRenderer': {
+    'on': function() {},
+  },
+});
+
+mock('home-dir', function () {
+  return '/Users/jean-tester';
+});
+
+mock('github', function () {
+  return {
+    'authenticate': function(config) { },
+    'gists': {
+        'edit': function(request, callback) { },
+        'create': function(request, callback) { },
+    },
+  };
+});
+
+mock('react-notification-system', function () {
+  return {
+    'addNotification': function(config) { },
+    'render': function() {return null;},
+  };
+});
+
+mock('spawnteract', {
+  'launch': function(kernelSpec, config) { return new Promise() },
+});

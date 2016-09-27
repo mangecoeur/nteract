@@ -5,61 +5,60 @@ import { DragDropContext as dragDropContext } from 'react-dnd';
 import HTML5Backend from 'react-dnd-html5-backend';
 import { connect } from 'react-redux';
 
+import Immutable from 'immutable';
+
+import {
+  defaultDisplayOrder as displayOrder,
+  defaultTransforms as transforms,
+} from './transforms';
+
 import Cell from './cell/cell';
 import DraggableCell from './cell/draggable-cell';
 import CellCreator from './cell/cell-creator';
-import { executeCell, focusNextCell, moveCell } from '../actions';
-
-import complete from '../api/messaging/completion';
-
-import Immutable from 'immutable';
-
-import { displayOrder, transforms } from 'transformime-react';
+import StatusBar from './status-bar';
+import {
+  focusNextCell,
+  moveCell,
+} from '../actions';
+import { executeCell } from '../epics/execute';
 
 // Always set up the markdown mode
 require('codemirror/mode/markdown/markdown');
 
 const mapStateToProps = (state) => ({
-  theme: state.document.theme,
+  theme: state.app.theme,
+  lastSaved: state.app.get('lastSaved'),
+  kernelSpecName: state.app.get('kernelSpecName'),
   notebook: state.document.get('notebook'),
-  channels: state.app.channels,
   cellPagers: state.document.get('cellPagers'),
   focusedCell: state.document.get('focusedCell'),
-  cellStatuses: state.document.get('cellStatuses'),
-  outputStatuses: state.document.get('outputStatuses'),
   stickyCells: state.document.get('stickyCells'),
-  notificationSystem: state.app.notificationSystem,
-  kernelConnected: state.app.channels &&
-    !(state.app.executionState === 'starting' ||
-      state.app.executionState === 'not connected'),
+  executionState: state.app.get('executionState'),
 });
 
-class Notebook extends React.Component {
+export class Notebook extends React.Component {
   static propTypes = {
-    channels: React.PropTypes.any,
-    dispatch: React.PropTypes.func,
     displayOrder: React.PropTypes.instanceOf(Immutable.List),
     notebook: React.PropTypes.any,
     transforms: React.PropTypes.instanceOf(Immutable.Map),
     cellPagers: React.PropTypes.instanceOf(Immutable.Map),
-    cellStatuses: React.PropTypes.instanceOf(Immutable.Map),
-    outputStatuses: React.PropTypes.instanceOf(Immutable.Map),
     stickyCells: React.PropTypes.instanceOf(Immutable.Map),
     focusedCell: React.PropTypes.string,
     theme: React.PropTypes.string,
-    kernelConnected: React.PropTypes.bool,
-    notificationSystem: React.PropTypes.any,
+    lastSaved: React.PropTypes.instanceOf(Date),
+    kernelSpecName: React.PropTypes.string,
+    CellComponent: React.PropTypes.any,
+    executionState: React.PropTypes.string,
   };
 
   static defaultProps = {
     displayOrder,
     transforms,
+    CellComponent: DraggableCell,
   };
 
-  static propsTypes = {
-    dispatch: React.PropTypes.func,
-    notificationSystem: React.PropTypes.any,
-    kernelConnected: React.PropTypes.bool,
+  static contextTypes = {
+    store: React.PropTypes.object,
   };
 
   constructor() {
@@ -70,7 +69,6 @@ class Notebook extends React.Component {
     this.createStickyCellElement = this.createStickyCellElement.bind(this);
     this.keyDown = this.keyDown.bind(this);
     this.moveCell = this.moveCell.bind(this);
-    this.getCompletions = this.getCompletions.bind(this);
   }
 
   componentDidMount() {
@@ -95,10 +93,6 @@ class Notebook extends React.Component {
     document.removeEventListener('keydown', this.keyDown);
   }
 
-  getCompletions(source, cursor) {
-    return complete(this.props.channels, source, cursor);
-  }
-
   getLanguageMode() {
     // The syntax highlighting language should be set in the language info
     // object.  First try codemirror_mode, then name, and fallback on 'null'.
@@ -121,15 +115,16 @@ class Notebook extends React.Component {
       // This is the notebook though, so hands off
       // We'll want to check for this existing later
       // and any other validation
-      require(`codemirror/mode/${language}/${language}`); // eslint-disable-line global-require
+      /* eslint-disable */
+      require(`codemirror/mode/${language}/${language}`);
+      /* eslint-enable */
     }
     return language;
   }
 
   moveCell(sourceId, destinationId, above) {
-    this.props.dispatch(moveCell(sourceId, destinationId, above));
+    this.context.store.dispatch(moveCell(sourceId, destinationId, above));
   }
-
 
   keyDown(e) {
     if (e.keyCode !== 13) {
@@ -152,17 +147,14 @@ class Notebook extends React.Component {
     const cell = cellMap.get(id);
 
     if (e.shiftKey) {
-      this.props.dispatch(focusNextCell(this.props.focusedCell, true));
+      this.context.store.dispatch(focusNextCell(this.props.focusedCell, true));
     }
 
     if (cell.get('cell_type') === 'code') {
-      this.props.dispatch(
+      this.context.store.dispatch(
         executeCell(
-          this.props.channels,
           id,
-          cell.get('source'),
-          this.props.kernelConnected,
-          this.props.notificationSystem
+          cell.get('source')
         )
       );
     }
@@ -201,16 +193,16 @@ class Notebook extends React.Component {
       id,
       cell,
       language: this.getLanguageMode(),
-      getCompletions: this.getCompletions,
       key: id,
       ref: id,
       displayOrder: this.props.displayOrder,
-      outputStatus: this.props.outputStatuses.get(id),
       transforms: this.props.transforms,
       moveCell: this.moveCell,
       pagers: this.props.cellPagers.get(id),
       focusedCell: this.props.focusedCell,
-      running: this.props.cellStatuses.get(id) === 'busy',
+      running: cell.get('status') === 'busy',
+      // Theme is passed through to let the Editor component know when to
+      // tell CodeMirror to remeasure
       theme: this.props.theme,
     };
   }
@@ -219,13 +211,16 @@ class Notebook extends React.Component {
     const cellMap = this.props.notebook.get('cellMap');
     const cell = cellMap.get(id);
     const isStickied = this.props.stickyCells.get(id);
+
+    const CellComponent = this.props.CellComponent;
+
     return (
       <div key={`cell-container-${id}`} ref="container">
         {isStickied ?
           <div className="cell-placeholder">
             <span className="octicon octicon-link-external" />
           </div> :
-          <DraggableCell {...this.createCellProps(id, cell)} />}
+          <CellComponent {...this.createCellProps(id, cell)} />}
         <CellCreator key={`creator-${id}`} id={id} above={false} />
       </div>);
   }
@@ -242,20 +237,29 @@ class Notebook extends React.Component {
   render() {
     if (!this.props.notebook) {
       return (
-        <div className="notebook"></div>
+        <div className="notebook" />
       );
     }
     const cellOrder = this.props.notebook.get('cellOrder');
     return (
-      <div className="notebook" ref="cells">
-        <div className="sticky-cells-placeholder" ref="sticky-cells-placeholder" />
-        <div className="sticky-cell-container" ref="sticky-cell-container">
-          {cellOrder
-            .filter(id => this.props.stickyCells.get(id))
-            .map(this.createStickyCellElement)}
+      <div>
+        <div className="notebook" ref="cells">
+          <div className="sticky-cells-placeholder" ref="sticky-cells-placeholder" />
+          <div className="sticky-cell-container" ref="sticky-cell-container">
+            {cellOrder
+              .filter(id => this.props.stickyCells.get(id))
+              .map(this.createStickyCellElement)}
+          </div>
+          <CellCreator id={cellOrder.get(0, null)} above />
+          {cellOrder.map(this.createCellElement)}
         </div>
-        <CellCreator id={cellOrder.get(0, null)} above />
-        {cellOrder.map(this.createCellElement)}
+        <StatusBar
+          notebook={this.props.notebook}
+          lastSaved={this.props.lastSaved}
+          kernelSpecName={this.props.kernelSpecName}
+          executionState={this.props.executionState}
+        />
+        <link rel="stylesheet" href={`../static/styles/theme-${this.props.theme}.css`} />
       </div>
     );
   }

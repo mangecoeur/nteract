@@ -6,7 +6,6 @@ import { findDOMNode } from 'react-dom';
 import Immutable from 'immutable';
 
 import Cell from './cell';
-import CellContextMenu from './cell-context-menu';
 import { focusCell } from '../../actions';
 
 const cellSource = {
@@ -65,6 +64,10 @@ class DraggableCell extends React.Component {
     isOver: React.PropTypes.bool.isRequired,
     focusedCell: React.PropTypes.string,
     transforms: React.PropTypes.instanceOf(Immutable.Map).isRequired,
+    language: React.PropTypes.string,
+    running: React.PropTypes.bool,
+    theme: React.PropTypes.string,
+    pagers: React.PropTypes.instanceOf(Immutable.List),
   };
 
   static contextTypes = {
@@ -135,8 +138,17 @@ class DraggableCell extends React.Component {
           )
         }
         <div>
-          <Cell {...this.props} />
-          <CellContextMenu id={this.props.id} />
+          <Cell
+            cell={this.props.cell}
+            displayOrder={this.props.displayOrder}
+            id={this.props.id}
+            focusedCell={this.props.focusedCell}
+            language={this.props.language}
+            running={this.props.running}
+            theme={this.props.theme}
+            pagers={this.props.pagers}
+            transforms={this.props.transforms}
+          />
         </div>
       </div>
     );
