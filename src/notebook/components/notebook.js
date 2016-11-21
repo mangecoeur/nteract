@@ -1,15 +1,19 @@
+/* eslint-disable no-return-assign */
+/* @flow */
 import React from 'react';
 import ReactDOM from 'react-dom';
-import PureRenderMixin from 'react-addons-pure-render-mixin';
+import { shouldComponentUpdate } from 'react-addons-pure-render-mixin';
 import { DragDropContext as dragDropContext } from 'react-dnd';
 import HTML5Backend from 'react-dnd-html5-backend';
 import { connect } from 'react-redux';
 
-import Immutable from 'immutable';
+import { List as ImmutableList, Map as ImmutableMap } from 'immutable';
+
+import './cell/editor/codemirror-ipython';
 
 import {
-  defaultDisplayOrder as displayOrder,
-  defaultTransforms as transforms,
+  displayOrder,
+  transforms,
 } from './transforms';
 
 import Cell from './cell/cell';
@@ -18,38 +22,109 @@ import CellCreator from './cell/cell-creator';
 import StatusBar from './status-bar';
 import {
   focusNextCell,
+  focusNextCellEditor,
   moveCell,
+  executeCell,
 } from '../actions';
-import { executeCell } from '../epics/execute';
+import type { CellProps } from './cell/cell';
 
-// Always set up the markdown mode
+// Always set up the markdown modes
 require('codemirror/mode/markdown/markdown');
+require('codemirror/mode/gfm/gfm');
 
-const mapStateToProps = (state) => ({
-  theme: state.app.theme,
+// Common languages
+require('codemirror/mode/python/python');
+require('codemirror/mode/ruby/ruby');
+require('codemirror/mode/javascript/javascript');
+require('codemirror/mode/r/r');
+require('codemirror/mode/julia/julia');
+
+// Scala
+require('codemirror/mode/clike/clike');
+
+require('codemirror/mode/shell/shell');
+require('codemirror/mode/sql/sql');
+
+type Props = {
+  displayOrder: ImmutableList<any>,
+  notebook: any,
+  transforms: ImmutableMap<string, any>,
+  cellPagers: ImmutableMap<string, any>,
+  stickyCells: ImmutableMap<string, any>,
+  cellFocused: string,
+  editorFocused: string,
+  theme: string,
+  cursorBlinkRate: number,
+  lastSaved: Date,
+  kernelSpecName: string,
+  CellComponent: any,
+  executionState: string,
+};
+
+export function getLanguageMode(notebook: any): string {
+  // The syntax highlighting language should be set in the language info
+  // object.  First try codemirror_mode, then name, and fallback on 'null'.
+  const language =
+    notebook.getIn(['metadata', 'language_info', 'codemirror_mode', 'name'],
+    notebook.getIn(['metadata', 'language_info', 'codemirror_mode'],
+    notebook.getIn(['metadata', 'language_info', 'name'],
+    'text')));
+  return language;
+}
+/**
+ * Provide the appropriate position to scroll to when given cell position and size
+ * information.
+ * @param  {HTMLElement} el - Element to be compared against window and body for
+ * scrollTop value.
+ * @return {Integer} - An integer for the new document scrollTop value.
+ */
+export function scrollToElement(el: HTMLElement): number {
+  const viewportHeight = window.innerHeight;
+  const viewportOffset = document.body.scrollTop;
+
+  const cellTop = el.offsetTop;
+  const cellHeight = el.offsetHeight;
+
+  const belowFold = (cellTop + cellHeight) > (viewportOffset + viewportHeight);
+  const aboveFold = cellTop < viewportOffset;
+
+  if (aboveFold) {
+    return cellTop;
+  }
+
+  if (belowFold) {
+    if (cellHeight > viewportHeight) {
+      return cellTop;
+    }
+    const offset = viewportHeight - cellHeight;
+    return cellTop - offset;
+  }
+  return document.body.scrollTop;
+}
+
+const mapStateToProps = (state: Object) => ({
+  theme: state.config.get('theme'),
+  cursorBlinkRate: state.config.get('cursorBlinkRate'),
   lastSaved: state.app.get('lastSaved'),
   kernelSpecName: state.app.get('kernelSpecName'),
   notebook: state.document.get('notebook'),
   cellPagers: state.document.get('cellPagers'),
-  focusedCell: state.document.get('focusedCell'),
+  cellFocused: state.document.get('cellFocused'),
+  editorFocused: state.document.get('editorFocused'),
   stickyCells: state.document.get('stickyCells'),
   executionState: state.app.get('executionState'),
 });
 
 export class Notebook extends React.Component {
-  static propTypes = {
-    displayOrder: React.PropTypes.instanceOf(Immutable.List),
-    notebook: React.PropTypes.any,
-    transforms: React.PropTypes.instanceOf(Immutable.Map),
-    cellPagers: React.PropTypes.instanceOf(Immutable.Map),
-    stickyCells: React.PropTypes.instanceOf(Immutable.Map),
-    focusedCell: React.PropTypes.string,
-    theme: React.PropTypes.string,
-    lastSaved: React.PropTypes.instanceOf(Date),
-    kernelSpecName: React.PropTypes.string,
-    CellComponent: React.PropTypes.any,
-    executionState: React.PropTypes.string,
-  };
+  props: Props;
+  shouldComponentUpdate: (p: Props, s: any) => boolean;
+  createCellElement: (s: string) => ?React.Element<any>;
+  createStickyCellElement: (s: string) => ?React.Element<any>;
+  keyDown: (e: KeyboardEvent) => void;
+  moveCell: (source: string, dest: string, above: boolean) => void;
+  stickyCellsPlaceholder: HTMLElement;
+  stickyCellContainer: HTMLElement;
+  cellElements: ImmutableMap<string, any>;
 
   static defaultProps = {
     displayOrder,
@@ -61,72 +136,45 @@ export class Notebook extends React.Component {
     store: React.PropTypes.object,
   };
 
-  constructor() {
+  constructor(): void {
     super();
-    this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
-    this.languageCache = {};
+    this.shouldComponentUpdate = shouldComponentUpdate.bind(this);
     this.createCellElement = this.createCellElement.bind(this);
     this.createStickyCellElement = this.createStickyCellElement.bind(this);
     this.keyDown = this.keyDown.bind(this);
     this.moveCell = this.moveCell.bind(this);
+    this.cellElements = new ImmutableMap();
   }
 
-  componentDidMount() {
+  componentDidMount(): void {
     document.addEventListener('keydown', this.keyDown);
   }
 
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.focusedCell !== this.props.focusedCell) {
-      this.resolveScrollPosition(nextProps.focusedCell);
+  componentWillReceiveProps(nextProps: Props): void {
+    if (nextProps.cellFocused !== this.props.cellFocused) {
+      this.resolveScrollPosition(nextProps.cellFocused);
     }
   }
 
-  componentDidUpdate() {
-    // Make sure the document is vertically shifted so the top non-stickied
-    // cell is always visible.
-    const placeholder = ReactDOM.findDOMNode(this.refs['sticky-cells-placeholder']);
-    const container = ReactDOM.findDOMNode(this.refs['sticky-cell-container']);
-    placeholder.style.height = `${container.clientHeight}px`;
+  componentDidUpdate(): void {
+    if (this.stickyCellsPlaceholder) {
+      // Make sure the document is vertically shifted so the top non-stickied
+      // cell is always visible.
+      this.stickyCellsPlaceholder.style.height =
+        `${this.stickyCellContainer.clientHeight}px`;
+    }
   }
 
-  componentWillUnmount() {
+  componentWillUnmount(): void {
     document.removeEventListener('keydown', this.keyDown);
   }
 
-  getLanguageMode() {
-    // The syntax highlighting language should be set in the language info
-    // object.  First try codemirror_mode, then name, and fallback on 'null'.
-    let language =
-      this.props.notebook.getIn(['metadata', 'language_info', 'codemirror_mode', 'name'],
-      this.props.notebook.getIn(['metadata', 'language_info', 'codemirror_mode'],
-      this.props.notebook.getIn(['metadata', 'language_info', 'name'],
-      'text')));
-
-    // TODO: Load the ipython codemirror mode from somewhere
-    if (language === 'ipython') {
-      language = 'python';
-    }
-
-    if (language !== 'text' && !this.languageCache[language]) {
-      this.languageCache[language] = true;
-
-      // HACK: This should give you the heeby-jeebies
-      // Mostly because language could be ../../../../whatever
-      // This is the notebook though, so hands off
-      // We'll want to check for this existing later
-      // and any other validation
-      /* eslint-disable */
-      require(`codemirror/mode/${language}/${language}`);
-      /* eslint-enable */
-    }
-    return language;
-  }
-
-  moveCell(sourceId, destinationId, above) {
+  moveCell(sourceId: string, destinationId: string, above: boolean): void {
     this.context.store.dispatch(moveCell(sourceId, destinationId, above));
   }
 
-  keyDown(e) {
+  keyDown(e: KeyboardEvent): void {
+    // If enter is not pressed, do nothing
     if (e.keyCode !== 13) {
       return;
     }
@@ -136,18 +184,19 @@ export class Notebook extends React.Component {
       return;
     }
 
-    if (!this.props.focusedCell) {
+    if (!this.props.cellFocused) {
       return;
     }
 
     e.preventDefault();
 
     const cellMap = this.props.notebook.get('cellMap');
-    const id = this.props.focusedCell;
+    const id = this.props.cellFocused;
     const cell = cellMap.get(id);
 
     if (e.shiftKey) {
-      this.context.store.dispatch(focusNextCell(this.props.focusedCell, true));
+      this.context.store.dispatch(focusNextCell(this.props.cellFocused, true));
+      this.context.store.dispatch(focusNextCellEditor(id));
     }
 
     if (cell.get('cell_type') === 'code') {
@@ -160,54 +209,35 @@ export class Notebook extends React.Component {
     }
   }
 
-  resolveScrollPosition(id) {
-    const viewportHeight = window.innerHeight;
-    const viewportOffset = document.body.scrollTop;
-
-    const focusedCell = ReactDOM.findDOMNode(this.refs[id]);
-
-    if (focusedCell) {
-      const cellTop = focusedCell.offsetTop;
-      const cellHeight = focusedCell.offsetHeight;
-
-      const belowFold = (cellTop + cellHeight) > (viewportOffset + viewportHeight);
-      const aboveFold = cellTop < viewportOffset;
-
-      if (aboveFold) {
-        document.body.scrollTop = cellTop;
-      }
-
-      if (belowFold) {
-        if (cellHeight > viewportHeight) {
-          document.body.scrollTop = cellTop;
-        } else {
-          const offset = viewportHeight - cellHeight;
-          document.body.scrollTop = cellTop - offset;
-        }
-      }
+  resolveScrollPosition(id: string): void {
+    const cellFocused = this.cellElements.get(id);
+    if (cellFocused) {
+      document.body.scrollTop = scrollToElement(cellFocused);
     }
   }
 
-  createCellProps(id, cell) {
+  createCellProps(id: string, cell: any): CellProps {
     return {
       id,
       cell,
-      language: this.getLanguageMode(),
+      language: getLanguageMode(this.props.notebook),
       key: id,
-      ref: id,
+      ref: (el) => { this.cellElements = this.cellElements.set(id, el); },
       displayOrder: this.props.displayOrder,
       transforms: this.props.transforms,
       moveCell: this.moveCell,
       pagers: this.props.cellPagers.get(id),
-      focusedCell: this.props.focusedCell,
+      cellFocused: this.props.cellFocused,
+      editorFocused: this.props.editorFocused,
       running: cell.get('status') === 'busy',
       // Theme is passed through to let the Editor component know when to
       // tell CodeMirror to remeasure
       theme: this.props.theme,
+      cursorBlinkRate: this.props.cursorBlinkRate,
     };
   }
 
-  createCellElement(id) {
+  createCellElement(id: string): ?React.Element<any> {
     const cellMap = this.props.notebook.get('cellMap');
     const cell = cellMap.get(id);
     const isStickied = this.props.stickyCells.get(id);
@@ -215,7 +245,7 @@ export class Notebook extends React.Component {
     const CellComponent = this.props.CellComponent;
 
     return (
-      <div key={`cell-container-${id}`} ref="container">
+      <div key={`cell-container-${id}`}>
         {isStickied ?
           <div className="cell-placeholder">
             <span className="octicon octicon-link-external" />
@@ -225,16 +255,16 @@ export class Notebook extends React.Component {
       </div>);
   }
 
-  createStickyCellElement(id) {
+  createStickyCellElement(id: string): ?React.Element<any> {
     const cellMap = this.props.notebook.get('cellMap');
     const cell = cellMap.get(id);
     return (
-      <div key={`cell-container-${id}`} ref="container">
+      <div key={`cell-container-${id}`}>
         <Cell {...this.createCellProps(id, cell)} />
       </div>);
   }
 
-  render() {
+  render(): ?React.Element<any> {
     if (!this.props.notebook) {
       return (
         <div className="notebook" />
@@ -243,9 +273,15 @@ export class Notebook extends React.Component {
     const cellOrder = this.props.notebook.get('cellOrder');
     return (
       <div>
-        <div className="notebook" ref="cells">
-          <div className="sticky-cells-placeholder" ref="sticky-cells-placeholder" />
-          <div className="sticky-cell-container" ref="sticky-cell-container">
+        <div className="notebook">
+          <div
+            className="sticky-cells-placeholder"
+            ref={(ref) => { this.stickyCellsPlaceholder = ref; }}
+          />
+          <div
+            className="sticky-cell-container"
+            ref={(ref) => { this.stickyCellContainer = ref; }}
+          >
             {cellOrder
               .filter(id => this.props.stickyCells.get(id))
               .map(this.createStickyCellElement)}

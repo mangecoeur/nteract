@@ -4,7 +4,7 @@ import { shallow, mount } from 'enzyme';
 
 import Immutable from 'immutable';
 
-import { displayOrder, transforms } from 'transformime-react';
+import { displayOrder, transforms } from '../../../src/notebook/components/transforms';
 
 const TestBackend = require('react-dnd-test-backend');
 import { DragDropContext } from 'react-dnd';
@@ -29,7 +29,7 @@ const dummyCellStatuses = dummyCommutable.get('cellOrder')
         statuses.set(cellID, Immutable.fromJS({ outputHidden: false, inputHidden: false })),
       new Immutable.Map());
 
-import { Notebook, ConnectedNotebook } from '../../../src/notebook/components/notebook';
+import { Notebook, ConnectedNotebook, getLanguageMode, scrollToElement } from '../../../src/notebook/components/notebook';
 
 // Boilerplate test to make sure the testing setup is configured
 describe('Notebook', () => {
@@ -75,29 +75,11 @@ describe('Notebook', () => {
 
   describe('getLanguageMode', () => {
     it('determines the right language from the notebook metadata', () => {
-      const focusedCell = dummyCommutable.getIn(['cellOrder', 0]);
+      const lang = getLanguageMode(dummyCommutable);
+      expect(lang).to.equal('ipython');
 
-      const context = {
-        store: dummyStore(),
-      }
-
-      context.store.dispatch = sinon.spy();
-
-      const component = shallow(
-        <Notebook
-          notebook={dummyCommutable}
-          cellPagers={new Immutable.Map()}
-          cellStatuses={dummyCellStatuses}
-          stickyCells={(new Immutable.Map())}
-          CellComponent={Cell}
-          focusedCell={focusedCell}
-        />, { context });
-
-      const inst = component.instance();
-
-      const lang = inst.getLanguageMode()
-
-      expect(lang).to.equal('python');
+      const lang2 = getLanguageMode(dummyCommutable.setIn(['metadata', 'language_info', 'codemirror_mode', 'name'], 'r'))
+      expect(lang2).to.equal('r');
     });
   });
 
@@ -118,7 +100,7 @@ describe('Notebook', () => {
           cellStatuses={dummyCellStatuses}
           stickyCells={(new Immutable.Map())}
           CellComponent={Cell}
-          focusedCell={focusedCell}
+          cellFocused={focusedCell}
         />, { context });
 
       const inst = component.instance();
@@ -151,7 +133,7 @@ describe('Notebook', () => {
           cellStatuses={dummyCellStatuses}
           stickyCells={(new Immutable.Map())}
           CellComponent={Cell}
-          focusedCell={focusedCell}
+          cellFocused={focusedCell}
         />, { context });
 
       const inst = component.instance();
@@ -188,5 +170,37 @@ describe('Notebook DnD', () => {
     const backend = manager.getBackend();
 
     // TODO: Write tests for cell drag and drop
+  })
+})
+
+describe('scrollToElement', () => {
+  it('works for case aboveFold', () => {
+    let el = document.createElement('div');
+    el.offsetTop = 1111;
+    el.offsetHeight = 0;
+    window.innerHeight = 0;
+    document.body.scrollTop = 2000;
+    const scrollTop = scrollToElement(el);
+    expect(scrollTop).to.equal(1111);
+  });
+
+  it('works for belowFold and cellHeight greater than viewport', () => {
+    let el = document.createElement('div')
+    el.offsetTop = 100 //cellTop
+    el.offsetHeight = 100; //cellHeight
+    window.innerHeight = 99; //viewportHeight
+    document.body.scrollTop = 99; //viewportOffset
+    const scrollTop = scrollToElement(el);
+    expect(scrollTop).to.equal(100);
+  });
+
+  it('works for belowFold and cellHeight less than viewport', () => {
+    let el = document.createElement('div')
+    el.offsetTop = 100; //cellTop
+    el.offsetHeight = 100; //cellHeight
+    window.innerHeight = 100; //viewportHeight
+    document.body.scrollTop = 99; //viewportOffset
+    const scrollTop = scrollToElement(el);
+    expect(scrollTop).to.equal(100);
   })
 })

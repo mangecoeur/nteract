@@ -1,50 +1,62 @@
+// @flow
 import React from 'react';
-import PureRenderMixin from 'react-addons-pure-render-mixin';
-import Immutable from 'immutable';
+import { shouldComponentUpdate } from 'react-addons-pure-render-mixin';
+import { List as ImmutableList, Map as ImmutableMap } from 'immutable';
 
 import Inputs from './inputs';
-import { TogglableDisplay } from './display-area';
+import Display from './display-area';
 
 import Editor from './editor';
 import LatexRenderer from '../latex';
 
 import Pager from './pager';
 
+type Props = {
+  cell: ImmutableMap<string, any>,
+  displayOrder: ImmutableList<any>,
+  id: string,
+  language: string,
+  theme: string,
+  cursorBlinkRate: number,
+  transforms: ImmutableMap<string, any>,
+  cellFocused: boolean,
+  editorFocused: boolean,
+  pagers: ImmutableList<any>,
+  running: boolean,
+  focusAbove: Function,
+  focusBelow: Function,
+  tabSize: number,
+};
+
 class CodeCell extends React.Component {
-  static propTypes = {
-    cell: React.PropTypes.instanceOf(Immutable.Map).isRequired,
-    displayOrder: React.PropTypes.instanceOf(Immutable.List).isRequired,
-    id: React.PropTypes.string,
-    language: React.PropTypes.string,
-    theme: React.PropTypes.string,
-    transforms: React.PropTypes.instanceOf(Immutable.Map),
-    focused: React.PropTypes.bool,
-    pagers: React.PropTypes.instanceOf(Immutable.List),
-    running: React.PropTypes.bool,
-    focusAbove: React.PropTypes.func,
-    focusBelow: React.PropTypes.func,
-  };
+  props: Props;
+  shouldComponentUpdate: (p: Props, s: any) => boolean;
 
   static defaultProps = {
-    pagers: new Immutable.List(),
+    pagers: new ImmutableList(),
     running: false,
+    tabSize: 4,
   };
 
-  constructor(props) {
-    super(props);
-    this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
+  constructor(): void {
+    super();
+    this.shouldComponentUpdate = shouldComponentUpdate.bind(this);
   }
 
-  isOutputHidden() {
-    return this.props.cell.get('outputHidden');
+  isOutputHidden(): any {
+    return this.props.cell.getIn(['metadata', 'outputHidden']);
   }
 
-  isInputHidden() {
-    return this.props.cell.get('inputHidden');
+  isInputHidden(): any {
+    return this.props.cell.getIn(['metadata', 'inputHidden']);
   }
 
-  render() {
-    return (<div>
+  isOutputExpanded() {
+    return this.props.cell.getIn(['metadata', 'outputExpanded']);
+  }
+
+  render(): ?React.Element<any> {
+    return (<div className={this.props && this.props.running ? 'cell-running' : ''} >
       {
         !this.isInputHidden() ?
           <div className="input-container">
@@ -55,14 +67,17 @@ class CodeCell extends React.Component {
             <Editor
               completion
               id={this.props.id}
+              tabSize={this.props.tabSize}
               input={this.props.cell.get('source')}
               language={this.props.language}
-              focused={this.props.focused}
+              cellFocused={this.props.cellFocused}
+              editorFocused={this.props.editorFocused}
               theme={this.props.theme}
+              cursorBlinkRate={this.props.cursorBlinkRate}
               focusAbove={this.props.focusAbove}
               focusBelow={this.props.focusBelow}
             />
-          </div> : null
+          </div> : <div className="input-container invisible" />
       }
       {
         this.props.pagers && !this.props.pagers.isEmpty() ?
@@ -83,13 +98,14 @@ class CodeCell extends React.Component {
       }
       <LatexRenderer>
         <div className="outputs">
-          <TogglableDisplay
+          <Display
             className="outputs-display"
             outputs={this.props.cell.get('outputs')}
-            isHidden={this.isOutputHidden()}
             displayOrder={this.props.displayOrder}
             transforms={this.props.transforms}
             theme={this.props.theme}
+            expanded={this.isOutputExpanded()}
+            isHidden={this.isOutputHidden()}
           />
         </div>
       </LatexRenderer>

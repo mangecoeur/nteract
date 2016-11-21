@@ -16,12 +16,8 @@ import {
 
 import {
   executeCellEpic,
+  updateDisplayEpic,
 } from './execute';
-
-import {
-  getStoredThemeEpic,
-  setThemeEpic,
-} from './theming';
 
 import {
   publishEpic,
@@ -31,19 +27,27 @@ import {
   commListenEpic,
 } from './comm';
 
+import {
+  loadConfigEpic,
+  saveConfigEpic,
+  saveConfigOnChangeEpic,
+} from './config';
+
 const epics = [
   commListenEpic,
   publishEpic,
-  getStoredThemeEpic,
-  setThemeEpic,
   saveEpic,
   saveAsEpic,
   loadEpic,
   newNotebookEpic,
   executeCellEpic,
+  updateDisplayEpic,
   newKernelEpic,
   acquireKernelInfoEpic,
   watchExecutionStateEpic,
+  loadConfigEpic,
+  saveConfigEpic,
+  saveConfigOnChangeEpic,
 ];
 
 export default epics;

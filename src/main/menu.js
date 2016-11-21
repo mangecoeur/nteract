@@ -1,10 +1,19 @@
 import { dialog, app, shell, Menu, ipcMain as ipc,
          BrowserWindow } from 'electron';
 import * as path from 'path';
-
 import { launch, launchNewNotebook } from './launch';
+import { installShellCommand } from './cli';
 
 const kernelspecs = require('kernelspecs');
+
+function getExampleNotebooksDir() {
+  if (process.env.NODE_ENV === 'development') {
+    return path.resolve(path.join(__dirname, '..', '..', 'example-notebooks'));
+  }
+  return path.join(process.resourcesPath, 'example-notebooks');
+}
+
+const exampleNotebooksDirectory = getExampleNotebooksDir();
 
 function send(focusedWindow, eventName, obj) {
   if (!focusedWindow) {
@@ -20,25 +29,30 @@ function createSender(eventName, obj) {
   };
 }
 
-export function githubAuth(item, focusedWindow) {
-  const win = new BrowserWindow({ show: false,
-                                  webPreferences: { zoomFactor: 0.75 } });
+export function authAndPublish(item, focusedWindow) {
+  const win = new BrowserWindow({
+    show: false,
+    webPreferences: { zoomFactor: 0.75 }
+  });
+  if (process.env.AUTHENTICATED) {
+    send(focusedWindow, 'menu:github:auth');
+    return;
+  }
   win.webContents.on('dom-ready', () => {
     if (win.getURL().indexOf('callback?code=') !== -1) {
       win.webContents.executeJavaScript(`
         require('electron').ipcRenderer.send('auth', document.body.textContent);
         `);
       ipc.on('auth', (event, auth) => {
-        const authorization = JSON.parse(auth);
-        send(focusedWindow, 'menu:publish:auth', authorization.access_token);
+        send(focusedWindow, 'menu:github:auth', JSON.parse(auth).access_token);
+        process.env.AUTHENTICATED = true;
         win.close();
-        return;
       });
     } else {
       win.show();
     }
   });
-  win.loadURL('https://nteract-oauth.now.sh/github');
+  win.loadURL('https://oauth.nteract.io/github');
 }
 
 export const fileSubMenus = {
@@ -57,8 +71,11 @@ export const fileSubMenus = {
         properties: [
           'openFile',
         ],
-        defaultPath: app.getPath('home'),
       };
+      if (process.cwd() === '/') {
+        opts.defaultPath = app.getPath('home');
+      }
+
       dialog.showOpenDialog(opts, (fname) => {
         if (fname) {
           launch(fname[0]);
@@ -66,6 +83,131 @@ export const fileSubMenus = {
       });
     },
     accelerator: 'CmdOrCtrl+O',
+  },
+  openExampleNotebooks: {
+    label: '&Open Example Notebooks',
+    submenu: [
+      {
+        label: '&Intro',
+        click: () => {
+          const opts = {
+            title: 'Open a notebook',
+            filters: [
+              { name: 'Notebooks', extensions: ['ipynb'] },
+            ],
+            properties: [
+              'openFile',
+            ],
+          };
+          launch(path.join(exampleNotebooksDirectory, 'intro.ipynb'));
+        },
+      },
+      {
+        label: '&Plotly',
+        click: () => {
+          const opts = {
+            title: 'Open a notebook',
+            filters: [
+              { name: 'Notebooks', extensions: ['ipynb'] },
+            ],
+            properties: [
+              'openFile',
+            ],
+          };
+          launch(path.join(exampleNotebooksDirectory, 'plotly.ipynb'));
+        },
+      },
+      {
+        label: '&Plotlyr',
+        click: () => {
+          const opts = {
+            title: 'Open a notebook',
+            filters: [
+              { name: 'Notebooks', extensions: ['ipynb'] },
+            ],
+            properties: [
+              'openFile',
+            ],
+          };
+          launch(path.join(exampleNotebooksDirectory, 'plotlyr.ipynb'));
+        },
+      },
+      {
+        label: '&Altair',
+        click: () => {
+          const opts = {
+            title: 'Open a notebook',
+            filters: [
+              { name: 'Notebooks', extensions: ['ipynb'] },
+            ],
+            properties: [
+              'openFile',
+            ],
+          };
+          launch(path.join(exampleNotebooksDirectory, 'altair.ipynb'));
+        },
+      },
+      {
+        label: '&Geojson',
+        click: () => {
+          const opts = {
+            title: 'Open a notebook',
+            filters: [
+              { name: 'Notebooks', extensions: ['ipynb'] },
+            ],
+            properties: [
+              'openFile',
+            ],
+          };
+          launch(path.join(exampleNotebooksDirectory, 'geojson.ipynb'));
+        },
+      },
+      {
+        label: '&Pandas to GeoJSON',
+        click: () => {
+          const opts = {
+            title: 'Open a notebook',
+            filters: [
+              { name: 'Notebooks', extensions: ['ipynb'] },
+            ],
+            properties: [
+              'openFile',
+            ],
+          };
+          launch(path.join(exampleNotebooksDirectory, 'pandas-to-geojson.ipynb'));
+        },
+      },
+      {
+        label: '&Named display updates',
+        click: () => {
+          const opts = {
+            title: 'Open a notebook',
+            filters: [
+              { name: 'Notebooks', extensions: ['ipynb'] },
+            ],
+            properties: [
+              'openFile',
+            ],
+          };
+          launch(path.join(exampleNotebooksDirectory, 'display-updates.ipynb'));
+        },
+      },
+      {
+        label: '&Analyze nteract download metrics',
+        click: () => {
+          const opts = {
+            title: 'Open a notebook',
+            filters: [
+              { name: 'Notebooks', extensions: ['ipynb'] },
+            ],
+            properties: [
+              'openFile',
+            ],
+          };
+          launch(path.join(exampleNotebooksDirectory, 'download-stats.ipynb'));
+        },
+      }
+    ]
   },
   save: {
     label: '&Save',
@@ -78,8 +220,12 @@ export const fileSubMenus = {
       const opts = {
         title: 'Save Notebook As',
         filters: [{ name: 'Notebooks', extensions: ['ipynb'] }],
-        defaultPath: app.getPath('home'),
       };
+
+      if (process.cwd() === '/') {
+        opts.defaultPath = app.getPath('home');
+      }
+
       dialog.showSaveDialog(opts, (filename) => {
         if (!filename) {
           return;
@@ -95,11 +241,11 @@ export const fileSubMenus = {
     label: '&Publish',
     submenu: [
       {
-        label: '&Authenticate',
-        click: githubAuth,
+        label: '&User Gist',
+        click: authAndPublish,
       },
       {
-        label: '&Publish To Gist',
+        label: '&Anonymous Gist',
         click: createSender('menu:publish:gist'),
       },
     ],
@@ -111,6 +257,7 @@ export const file = {
   submenu: [
     fileSubMenus.new,
     fileSubMenus.open,
+    fileSubMenus.openExampleNotebooks,
     fileSubMenus.save,
     fileSubMenus.saveAs,
     fileSubMenus.publish,
@@ -149,6 +296,11 @@ export const edit = {
       click: createSender('menu:new-code-cell'),
     },
     {
+      label: 'New Text Cell',
+      accelerator: 'CmdOrCtrl+Shift+M',
+      click: createSender('menu:new-text-cell'),
+    },
+    {
       label: 'Copy Cell',
       accelerator: 'CmdOrCtrl+Shift+C',
       click: createSender('menu:copy-cell'),
@@ -174,9 +326,17 @@ export const cell = {
       click: createSender('menu:run-all'),
     },
     {
+      label: 'Run All Below',
+      click: createSender('menu:run-all-below'),
+    },
+    {
       label: 'Clear All',
       click: createSender('menu:clear-all'),
     },
+    {
+      label: 'Unhide All',
+      click: createSender('menu:unhide-all'),
+    }
   ],
 };
 const theme_menu = [
@@ -192,6 +352,22 @@ const theme_menu = [
     label: 'Classic',
     click: createSender('menu:theme', 'classic'),
   },
+  {
+    label: 'nteract',
+    click: createSender('menu:theme', 'nteract'),
+  },
+];
+const blink_menu = [
+  // TODO: replace the with one `type: 'checkbox'` item once we have state to
+  // know which way it should be set initially.
+  {
+    label: 'Do Not Blink Editor Cursor',
+    click: createSender('menu:set-blink-rate', 0),
+  },
+  {
+    label: 'Blink Editor Cursor',
+    click: createSender('menu:set-blink-rate', 530),
+  },
 ];
 
 const today = new Date();
@@ -203,9 +379,9 @@ if (month === 12) {
       label: 'Hohoho',
       click: createSender('menu:theme', 'christmas'),
     });
-} else if (month === 10 && day === 31) {
+} else if (month === 10) {
   theme_menu.push({
-    label: 'Mwaaahahahhah',
+    label: 'Pumpkin Spice',
     click: createSender('menu:theme', 'halloween'),
   });
 }
@@ -252,6 +428,11 @@ export const view = {
       },
     },
     {
+      label: 'Actual Size',
+      accelerator: 'CmdOrCtrl+0',
+      click: createSender('menu:zoom-reset'),
+    },
+    {
       label: 'Zoom In',
       accelerator: 'CmdOrCtrl+=',
       click: createSender('menu:zoom-in'),
@@ -264,6 +445,11 @@ export const view = {
     {
       label: 'Theme',
       submenu: theme_menu,
+    },
+
+    {
+      label: 'Editor options',
+      submenu: blink_menu,
     },
   ],
 };
@@ -300,16 +486,27 @@ if (process.platform === 'darwin') {
 
 export const window = windowDraft;
 
-export const help = {
+const shellCommands = {
+  label: 'Install Shell Commands',
+  click: () => installShellCommand(),
+};
+
+const helpDraft = {
   label: 'Help',
   role: 'help',
   submenu: [
     {
       label: 'Learn More',
-      click: () => { shell.openExternal('http://github.com/nteract/nteract'); },
-    },
-  ],
+      click: () => { shell.openExternal('http://github.com/nteract/nteract'); }
+    }
+  ]
 };
+
+if (process.platform !== 'darwin') {
+  helpDraft.submenu.unshift(shellCommands, { type: 'separator' });
+}
+
+export const help = helpDraft;
 
 const name = 'nteract';
 app.setName(name);
@@ -321,6 +518,10 @@ export const named = {
       label: `About ${name}`,
       role: 'about',
     },
+    {
+      type: 'separator',
+    },
+    shellCommands,
     {
       type: 'separator',
     },
@@ -433,6 +634,7 @@ export function loadFullMenu() {
           submenu: newNotebookItems,
         },
         fileSubMenus.open,
+        fileSubMenus.openExampleNotebooks,
         fileSubMenus.save,
         fileSubMenus.saveAs,
         fileSubMenus.publish,

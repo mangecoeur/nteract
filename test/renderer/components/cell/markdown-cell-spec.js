@@ -9,12 +9,13 @@ chai.use(sinonChai);
 
 import MarkdownCell from '../../../../src/notebook/components/cell/markdown-cell';
 import {
+  focusCellEditor,
   focusPreviousCell,
   focusNextCell,
 } from '../../../../src/notebook/actions';
 
 import * as commutable from 'commutable';
-import { displayOrder, transforms } from 'transformime-react';
+import { displayOrder, transforms } from '../../../../src/notebook/components/transforms';
 
 import { dummyStore } from '../../../utils';
 
@@ -27,8 +28,16 @@ describe('MarkdownCell', () => {
   });
 
   it('toggles view mode with key events', () => {
+    const store = dummyStore();
+    store.dispatch = sinon.spy();
+
     const cell = mount(
-      <MarkdownCell cell={commutable.emptyMarkdownCell} {...{ displayOrder, transforms }}/>
+      <MarkdownCell
+      id='1234'
+      cell={commutable.emptyMarkdownCell}
+      focusEditor={() => store.dispatch(focusCellEditor('1234'))}
+      {...{ displayOrder, transforms }} />,
+      { context: { store } }
     );
 
     // Starts in view mode
@@ -36,6 +45,11 @@ describe('MarkdownCell', () => {
 
     cell.simulate('keydown', { key: 'Enter'})
     expect(cell.state('view')).to.be.false;
+    expect(store.dispatch.firstCall).to.be.calledWith({
+      type: 'FOCUS_CELL_EDITOR',
+      id: '1234',
+    });
+
     cell.simulate('keydown', { key: 'Enter', shiftKey: true })
     // Stays in view mode on shift enter
     expect(cell.state('view')).to.be.true;

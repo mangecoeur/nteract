@@ -59,15 +59,11 @@ describe('updateCellSource', () => {
   })
 });
 
-describe('updateCellOutputs', () => {
-  it('creates a UPDATE_CELL_OUTPUTS action', () => {
-    expect(actions.updateCellOutputs('1234', {'data': 'woo'})).to.deep.equal({
-      type: constants.UPDATE_CELL_OUTPUTS,
-      id: '1234',
-      outputs: {'data': 'woo'},
-    });
+describe('clearOutputs', () => {
+  it('creates a CLEAR_OUTPUTS action', () => {
+    expect(actions.clearOutputs('woo')).to.deep.equal({ type: 'CLEAR_OUTPUTS', id: 'woo' })
   })
-});
+})
 
 describe('updateCellExecutionCount', () => {
   it('creates a UPDATE_CELL_EXECUTION_COUNT action', () => {
@@ -145,10 +141,37 @@ describe('focusNextCell', () => {
   });
 });
 
-describe('focusNextCell', () => {
+describe('focusPreviousCell', () => {
   it('creates a FOCUS_PREVIOUS_CELL action', () => {
     expect(actions.focusPreviousCell('1234')).to.deep.equal({
       type: constants.FOCUS_PREVIOUS_CELL,
+      id: '1234',
+    });
+  });
+});
+
+describe('focusCellEditor', () => {
+  it('creates a FOCUS_CELL_EDITOR action', () => {
+    expect(actions.focusCellEditor('1234')).to.deep.equal({
+      type: constants.FOCUS_CELL_EDITOR,
+      id: '1234',
+    });
+  });
+});
+
+describe('focusPreviousCellEditor', () => {
+  it('creates a FOCUS_PREVIOUS_CELL_EDITOR action', () => {
+    expect(actions.focusPreviousCellEditor('1234')).to.deep.equal({
+      type: constants.FOCUS_PREVIOUS_CELL_EDITOR,
+      id: '1234',
+    });
+  });
+});
+
+describe('focusNextCellEditor', () => {
+  it('creates a FOCUS_NEXT_CELL_EDITOR action', () => {
+    expect(actions.focusNextCellEditor('1234')).to.deep.equal({
+      type: constants.FOCUS_NEXT_CELL_EDITOR,
       id: '1234',
     });
   });
@@ -313,10 +336,19 @@ describe('changeCellType', () => {
 });
 
 describe('setGithubToken', () => {
-  it('create a SET_GITHUB_TOKEN action', () => {
+  it('creates a SET_GITHUB_TOKEN action', () => {
     expect(actions.setGithubToken('token_string')).to.deep.equal({
       type: constants.SET_GITHUB_TOKEN,
       githubToken: 'token_string',
+    });
+  });
+});
+
+describe('toggleOutputExpansion', () => {
+  it('creates a TOGGLE_OUTPUT_EXPANSION action', () => {
+    expect(actions.toggleOutputExpansion('235')).to.deep.equal({
+      type: constants.TOGGLE_OUTPUT_EXPANSION,
+      id: '235',
     });
   });
 });

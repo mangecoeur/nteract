@@ -31,6 +31,22 @@ describe('menu', () => {
     });
   });
 
+  describe('dispatchCreateTextCellAfter', () => {
+    it('dispatches a CREATE_TEXT_CELL_AFTER action', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
+
+      menu.dispatchCreateTextCellAfter(store);
+
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: constants.NEW_CELL_AFTER,
+        cellType: 'markdown',
+        source: '',
+        id: null,
+      });
+    });
+  });
+
   describe('dispatchPasteCell', () => {
     it('dispatches a PASTE_CELL action', () => {
       const store = dummyStore();
@@ -73,15 +89,43 @@ describe('menu', () => {
   });
 
   describe('dispatchSetTheme', () => {
-    it('dispatches a SET_THEME action', () => {
+    it('dispatches a SET_CONFIG_KEY action', () => {
       const store = dummyStore();
       store.dispatch = sinon.spy();
 
       menu.dispatchSetTheme(store, {}, 'test_theme');
 
       expect(store.dispatch.firstCall).to.be.calledWith({
-        type: constants.SET_THEME,
-        theme: 'test_theme',
+        type: constants.SET_CONFIG_KEY,
+        key: 'theme',
+        value: 'test_theme',
+      });
+    });
+  });
+  describe('dispatchSetCursorBlink', () => {
+    it('dispatches a SET_CONFIG_KEY action', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
+
+      menu.dispatchSetCursorBlink(store, {}, 42);
+
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: constants.SET_CONFIG_KEY,
+        key: 'cursorBlinkRate',
+        value: 42,
+      });
+    });
+  });
+
+  describe('dispatchLoadConfig', () => {
+    it('dispatches a LOAD_CONFIG action', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
+
+      menu.dispatchLoadConfig(store);
+
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: 'LOAD_CONFIG',
       });
     });
   });
@@ -104,8 +148,17 @@ describe('menu', () => {
     });
   });
 
+  describe('dispatchZoomReset', () => {
+    it('executes zoom reset', () => {
+      const setZoomLevel = sinon.spy(webFrame, 'setZoomLevel');
+      menu.dispatchZoomReset();
+      setZoomLevel.restore();
+      expect(setZoomLevel).to.be.calledWith(0);
+    });
+  });
+
   describe('dispatchRestartClearAll', () => {
-    it('dispatches KILL_KERNEL and CLEAR_CELL_OUTPUT actions', () => {
+    it('dispatches KILL_KERNEL and CLEAR_OUTPUTS actions', () => {
       const store = dummyStore();
       store.dispatch = sinon.spy();
 
@@ -118,95 +171,149 @@ describe('menu', () => {
   });
 
   describe('dispatchRestartKernel', () => {
-    const store = dummyStore();
-    store.dispatch = sinon.spy();
+    it('dispatches KILL_KERNEL and NEW_KERNEL actions', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
 
-    menu.dispatchRestartKernel(store);
+      menu.dispatchRestartKernel(store);
 
-    expect(store.dispatch.firstCall).to.be.calledWith({
-      type: constants.KILL_KERNEL,
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: constants.KILL_KERNEL,
+      });
     });
   });
 
   describe('dispatchInterruptKernel', () => {
-    const store = dummyStore();
-    store.dispatch = sinon.spy();
+    it('dispatches INTERRUPT_KERNEL actions', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
 
-    menu.dispatchInterruptKernel(store);
+      menu.dispatchInterruptKernel(store);
 
-    if (process.platform !== 'win32') {
-      expect(store.dispatch.firstCall).to.be.calledWith({
-        type: constants.INTERRUPT_KERNEL,
-      });
-    }
+      if (process.platform !== 'win32') {
+        expect(store.dispatch.firstCall).to.be.calledWith({
+          type: constants.INTERRUPT_KERNEL,
+        });
+      }
+    });
   });
 
   describe('dispatchKillKernel', () => {
-    const store = dummyStore();
-    store.dispatch = sinon.spy();
+    it('dispatches KILL_KERNEL actions', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
 
-    menu.dispatchKillKernel(store);
+      menu.dispatchKillKernel(store);
 
-    expect(store.dispatch.firstCall).to.be.calledWith({
-      type: constants.KILL_KERNEL,
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: constants.KILL_KERNEL,
+      });
     });
   });
 
   describe('dispatchClearAll', () => {
-    const store = dummyStore();
-    store.dispatch = sinon.spy();
+    it('dispatches CLEAR_OUTPUTS actions', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
 
-    menu.dispatchClearAll(store);
+      menu.dispatchClearAll(store);
 
-    expect(store.dispatch.firstCall).to.be.calledWith({
-      type: constants.CLEAR_CELL_OUTPUT,
-      id: store.getState().document.getIn(['notebook', 'cellOrder']).first()
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: constants.CLEAR_OUTPUTS,
+        id: store.getState().document.getIn(['notebook', 'cellOrder']).first()
+      });
+    });
+  });
+
+  describe('dispatchRunAllBelow', () => {
+    it('runs all code cells below the focused cell', () => {
+      const store = dummyStore({codeCellCount: 4, markdownCellCount: 4});
+      const markdownCells = store.getState().document.getIn(['notebook', 'cellMap'])
+                                                     .filter(cell => cell.get('cell_type') === 'markdown');
+      store.dispatch = sinon.spy();
+
+      menu.dispatchRunAllBelow(store);
+
+      expect(store.dispatch.calledThrice).to.equal(true);
+      for (let cellId of markdownCells.keys()) {
+          expect(store.dispatch.neverCalledWith({
+            type: 'EXECUTE_CELL',
+            id: cellId,
+            source: '',
+          })).to.equal(true);
+      }
     });
   });
 
   describe('dispatchRunAll', () => {
-    const store = dummyStore();
-    store.dispatch = sinon.spy();
+    it('dispatches EXECUTE_CELL for all cells action', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
 
-    menu.dispatchRunAll(store);
+      menu.dispatchRunAll(store);
 
-    const first = store.getState().document.getIn(['notebook', 'cellOrder']).first();
-    expect(store.dispatch.firstCall).to.be.calledWith({
-      type: 'EXECUTE_CELL',
-      id: first,
-      source: store.getState().document.getIn(['notebook', 'cellMap', first, 'source']),
+      const first = store.getState().document.getIn(['notebook', 'cellOrder']).first();
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: 'EXECUTE_CELL',
+        id: first,
+        source: store.getState().document.getIn(['notebook', 'cellMap', first, 'source']),
+      });
     });
   });
 
-  describe('dispatchPublishGist', () => {
-    const store = dummyStore();
-    store.dispatch = sinon.spy();
+  describe('dispatchUnhideAll', () => {
+    it('dispatches changeInputVisibility for hidden code cells', () => {
+      const store = dummyStore({ hideAll: true });
+      store.dispatch = sinon.spy();
 
-    menu.dispatchPublishGist(store);
+      menu.dispatchUnhideAll(store);
 
-    expect(store.dispatch.firstCall).to.be.calledWith({
-      type: 'PUBLISH_GIST',
+      const first = store.getState().document.getIn(['notebook', 'cellOrder']).first();
+      const expectedAction = { type: 'CHANGE_INPUT_VISIBILITY', id: first };
+      expect(store.dispatch.firstCall).to.be.calledWith(expectedAction);
     });
   });
 
-  describe('dispatchPublishAuth', () => {
-    const dispatch = sinon.spy();
-    const store = { dispatch };
-    menu.dispatchPublishAuth(store, {}, 'TOKEN');
-    const expectedAction = { type: 'SET_GITHUB_TOKEN', githubToken: 'TOKEN' };
-    expect(dispatch).to.have.been.calledWith(expectedAction);
+  describe('dispatchPublishAnonGist', () => {
+    it('dispatches PUBLISH_ANONYMOUS_GIST action', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
+      menu.dispatchPublishAnonGist(store);
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: 'PUBLISH_ANONYMOUS_GIST',
+      });
+    });
+  });
+
+  describe('dispatchPublishUserGist', () => {
+    it('sets github token if token provided', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
+      menu.dispatchPublishUserGist(store, {}, 'TOKEN');
+      const expectedAction = { type: 'SET_GITHUB_TOKEN', githubToken: 'TOKEN' };
+      expect(store.dispatch).to.have.been.calledWith(expectedAction);
+    });
+    it('dispatches setUserGithub and publishes gist', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
+      menu.dispatchPublishUserGist(store, {});
+      const expectedSecondAction = { type: 'PUBLISH_USER_GIST' };
+      expect(store.dispatch).to.have.been.calledWith(expectedSecondAction);
+      });
   });
 
   describe('dispatchNewKernel', () => {
-    const store = dummyStore();
-    store.dispatch = sinon.spy();
+    it('dispatches LAUNCH_KERNEL action', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
 
-    menu.dispatchNewKernel(store, {}, 'python2');
+      menu.dispatchNewKernel(store, {}, 'python2');
 
-    expect(store.dispatch.firstCall).to.be.calledWith({
-      type: constants.LAUNCH_KERNEL,
-      kernelSpecName: 'python2',
-      cwd: { 'cwd': process.cwd() },
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: constants.LAUNCH_KERNEL,
+        kernelSpecName: 'python2',
+        cwd: process.cwd(),
+      });
     });
   });
 
@@ -226,38 +333,44 @@ describe('menu', () => {
   });
 
   describe('dispatchSaveAs', () => {
-    const store = dummyStore();
-    store.dispatch = sinon.spy();
+    it('dispatches SAVE_AS action', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
 
-    menu.dispatchSaveAs(store, {}, 'test-ipynb.ipynb');
-    expect(store.dispatch.firstCall).to.be.calledWith({
-      type: 'SAVE_AS',
-      filename: 'test-ipynb.ipynb',
-      notebook: store.getState().document.get('notebook'),
+      menu.dispatchSaveAs(store, {}, 'test-ipynb.ipynb');
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: 'SAVE_AS',
+        filename: 'test-ipynb.ipynb',
+        notebook: store.getState().document.get('notebook'),
+      });
     });
   });
 
   describe('dispatchLoad', () => {
-    const store = dummyStore();
-    store.dispatch = sinon.spy();
+    it('dispatches LOAD action', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
 
-    menu.dispatchLoad(store, {}, 'test-ipynb.ipynb');
-    expect(store.dispatch.firstCall).to.be.calledWith({
-      type: 'LOAD',
-      filename: 'test-ipynb.ipynb',
+      menu.dispatchLoad(store, {}, 'test-ipynb.ipynb');
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: 'LOAD',
+        filename: 'test-ipynb.ipynb',
+      });
     });
   });
 
   describe('dispatchNewNotebook', () => {
-    const store = dummyStore();
-    store.dispatch = sinon.spy();
+    it('dispatches a NEW_NOTEBOOK action', () => {
+      const store = dummyStore();
+      store.dispatch = sinon.spy();
 
-    menu.dispatchNewNotebook(store, {}, 'perl');
-    expect(store.dispatch.firstCall).to.be.calledWith({
-      type: 'NEW_NOTEBOOK',
-      kernelSpecName: 'perl',
-      cwd: require('home-dir')(),
-    });
+      menu.dispatchNewNotebook(store, {}, 'perl');
+      expect(store.dispatch.firstCall).to.be.calledWith({
+        type: 'NEW_NOTEBOOK',
+        kernelSpecName: 'perl',
+        cwd: process.cwd(),
+      });
+    })
   });
 
   describe('initMenuHandlers', () => {
@@ -269,6 +382,7 @@ describe('menu', () => {
         'menu:new-kernel',
         'menu:run-all',
         'menu:clear-all',
+        'menu:unhide-all',
         'menu:save',
         'menu:save-as',
         'menu:new-code-cell',
@@ -280,10 +394,11 @@ describe('menu', () => {
         'menu:restart-kernel',
         'menu:restart-and-clear-all',
         'menu:publish:gist',
-        'menu:publish:auth',
+        'menu:github:auth',
         'menu:zoom-in',
         'menu:zoom-out',
         'menu:theme',
+        'menu:set-blink-rate',
         'main:load',
         'main:new',
       ].forEach(name => {

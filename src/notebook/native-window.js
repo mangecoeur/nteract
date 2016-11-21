@@ -1,13 +1,10 @@
 import { remote } from 'electron';
 
-import home from 'home-dir';
 import path from 'path';
 
 import Rx from 'rxjs/Rx';
 
-
-const HOME = home();
-const { getCurrentWindow } = remote;
+const HOME = remote.app.getPath('home');
 
 /**
  * Turn a path like /Users/n/mine.ipynb to ~/mine.ipynb
@@ -26,8 +23,7 @@ export function setTitleFromAttributes(attributes) {
   const filename = tildify(attributes.fullpath);
   const { executionState } = attributes;
 
-  const win = getCurrentWindow();
-  // TODO: Investigate if setRepresentedFilename() is a no-op on non-OS X
+  const win = remote.getCurrentWindow();
   if (filename && win.setRepresentedFilename) {
     win.setRepresentedFilename(attributes.fullpath);
     win.setDocumentEdited(attributes.modified);
@@ -38,12 +34,23 @@ export function setTitleFromAttributes(attributes) {
 
 export function createTitleFeed(state$) {
   const modified$ = state$
-    .map(state => state.document.get('notebook'))
-    .scan((prev, notebook) => ({
-      modified: prev.notebook === notebook,
-      notebook,
-    }), {})
+    .map(state => ({
+      // Assume not modified to start
+      modified: false,
+      notebook: state.document.get('notebook'),
+    }))
+    .distinctUntilChanged(last => last.notebook)
+    .scan((last, current) => ({
+      // We're missing logic for saved...
+      // All we know is if it was modified from last time
+      // The logic should be
+      //    modified: saved.notebook !== current.notebook
+      //        we don't have saved.notebook here
+      modified: last.notebook !== current.notebook,
+      notebook: current.notebook,
+    }))
     .pluck('modified');
+
 
   const fullpath$ = state$
     .map(state => state.metadata.get('filename') || 'Untitled');

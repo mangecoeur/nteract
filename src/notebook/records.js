@@ -4,7 +4,7 @@ const Github = require('github');
 
 export const AppRecord = new Immutable.Record({
   executionState: 'not connected',
-  github: new Github(), // default to no auth until setup
+  token: null,
   channels: null,
   spawn: null,
   connectionFile: null,
@@ -12,16 +12,20 @@ export const AppRecord = new Immutable.Record({
   kernelSpecName: null,
   isSaving: false,
   lastSaved: null,
-  theme: 'light',
+  configLastSaved: null,
   error: null,
 });
 
 export const DocumentRecord = new Immutable.Record({
   notebook: null,
+  transient: new Immutable.Map({
+    keyPathsForDisplays: new Immutable.Map(),
+  }),
   cellPagers: new Immutable.Map(),
   outputStatuses: new Immutable.Map(),
-  stickyCells: new Immutable.Map(),
-  focusedCell: null,
+  stickyCells: new Immutable.Set(),
+  editorFocused: null,
+  cellFocused: null,
   copied: new Immutable.Map(),
 });
 

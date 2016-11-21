@@ -1,23 +1,49 @@
+// @flow
+/* eslint-disable react/no-unused-prop-types */
 import React from 'react';
-import PureRenderMixin from 'react-addons-pure-render-mixin';
+import { shouldComponentUpdate } from 'react-addons-pure-render-mixin';
 import { DragSource, DropTarget } from 'react-dnd';
 import { findDOMNode } from 'react-dom';
 
-import Immutable from 'immutable';
+import { List as ImmutableList, Map as ImmutableMap } from 'immutable';
 
 import Cell from './cell';
 import { focusCell } from '../../actions';
 
+type Props = {
+  cell: ImmutableMap<string, any>,
+  connectDragPreview: (img: Image) => void,
+  connectDragSource: (el: ?React.Element<any>) => void,
+  connectDropTarget: (el: ?React.Element<any>) => void,
+  displayOrder: ImmutableList<any>,
+  id: string,
+  isDragging: boolean,
+  isOver: boolean,
+  cellFocused: string,
+  editorFocused: string,
+  transforms: ImmutableMap<string, any>,
+  language: string,
+  running: boolean,
+  theme: string,
+  cursorBlinkRate: number,
+  pagers: ImmutableList<any>,
+  moveCell: (source: string, dest: string, above: boolean) => Object,
+};
+
+type State = {
+  hoverUpperHalf: boolean,
+};
+
 const cellSource = {
-  beginDrag(props) {
+  beginDrag(props: Props) {
     return {
       id: props.id,
     };
   },
 };
 
-function isDragUpper(props, monitor, component) {
-  const hoverBoundingRect = findDOMNode(component).getBoundingClientRect();
+function isDragUpper(props: Props, monitor: Object, el: HTMLElement): boolean {
+  const hoverBoundingRect = el.getBoundingClientRect();
   const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
 
   const clientOffset = monitor.getClientOffset();
@@ -27,17 +53,22 @@ function isDragUpper(props, monitor, component) {
 }
 
 const cellTarget = {
-  drop(props, monitor, component) {
-    const hoverUpperHalf = isDragUpper(props, monitor, component);
-    props.moveCell(monitor.getItem().id, props.id, hoverUpperHalf);
+  drop(props: Props, monitor: Object|void, component: any): void {
+    if (monitor) {
+      const hoverUpperHalf = isDragUpper(props, monitor, component.el);
+      // DropTargetSpec monitor definition could be undefined. we'll need a check for monitor in order to pass validation.
+      props.moveCell(monitor.getItem().id, props.id, hoverUpperHalf);
+    }
   },
 
-  hover(props, monitor, component) {
-    component.setState({ hoverUpperHalf: isDragUpper(props, monitor, component) });
+  hover(props: Props, monitor: Object|void, component: any): void {
+    if (monitor) {
+      component.setState({ hoverUpperHalf: isDragUpper(props, monitor, component.el) });
+    }
   },
 };
 
-function collectSource(connect, monitor) {
+function collectSource(connect: Object, monitor: Object): Object {
   return {
     connectDragSource: connect.dragSource(),
     isDragging: monitor.isDragging(),
@@ -45,7 +76,7 @@ function collectSource(connect, monitor) {
   };
 }
 
-function collectTarget(connect, monitor) {
+function collectTarget(connect: Object, monitor: Object): Object {
   return {
     connectDropTarget: connect.dropTarget(),
     isOver: monitor.isOver(),
@@ -53,30 +84,19 @@ function collectTarget(connect, monitor) {
 }
 
 class DraggableCell extends React.Component {
-  static propTypes = {
-    cell: React.PropTypes.instanceOf(Immutable.Map).isRequired,
-    connectDragPreview: React.PropTypes.func.isRequired,
-    connectDragSource: React.PropTypes.func.isRequired,
-    connectDropTarget: React.PropTypes.func.isRequired,
-    displayOrder: React.PropTypes.instanceOf(Immutable.List).isRequired,
-    id: React.PropTypes.string,
-    isDragging: React.PropTypes.bool.isRequired,
-    isOver: React.PropTypes.bool.isRequired,
-    focusedCell: React.PropTypes.string,
-    transforms: React.PropTypes.instanceOf(Immutable.Map).isRequired,
-    language: React.PropTypes.string,
-    running: React.PropTypes.bool,
-    theme: React.PropTypes.string,
-    pagers: React.PropTypes.instanceOf(Immutable.List),
-  };
+  props: Props;
+  state: State;
+  shouldComponentUpdate: (p: Props, s: State) => boolean;
+  selectCell: () => void;
+  el: HTMLElement;
 
   static contextTypes = {
     store: React.PropTypes.object,
   };
 
-  constructor() {
+  constructor(): void {
     super();
-    this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
+    this.shouldComponentUpdate = shouldComponentUpdate.bind(this);
     this.selectCell = this.selectCell.bind(this);
   }
 
@@ -84,7 +104,7 @@ class DraggableCell extends React.Component {
     hoverUpperHalf: true,
   };
 
-  componentDidMount() {
+  componentDidMount(): void {
     const connectDragPreview = this.props.connectDragPreview;
     const img = new window.Image();
     img.src = [
@@ -113,11 +133,11 @@ class DraggableCell extends React.Component {
     };
   }
 
-  selectCell() {
+  selectCell(): void {
     this.context.store.dispatch(focusCell(this.props.id));
   }
 
-  render() {
+  render(): ?React.Element<any> {
     return this.props.connectDropTarget(
       <div
         style={{
@@ -128,6 +148,7 @@ class DraggableCell extends React.Component {
             '3px lightgray solid' : '3px transparent solid',
         }}
         className={'draggable-cell'}
+        ref={(el) => { this.el = el; }}
       >
         {
           this.props.connectDragSource(
@@ -142,10 +163,12 @@ class DraggableCell extends React.Component {
             cell={this.props.cell}
             displayOrder={this.props.displayOrder}
             id={this.props.id}
-            focusedCell={this.props.focusedCell}
+            cellFocused={this.props.cellFocused}
+            editorFocused={this.props.editorFocused}
             language={this.props.language}
             running={this.props.running}
             theme={this.props.theme}
+            cursorBlinkRate={this.props.cursorBlinkRate}
             pagers={this.props.pagers}
             transforms={this.props.transforms}
           />
@@ -155,6 +178,9 @@ class DraggableCell extends React.Component {
   }
 }
 
-const source = new DragSource('CELL', cellSource, collectSource);
-const target = new DropTarget('CELL', cellTarget, collectTarget);
+type Source = DragSource<any, Props, State, DraggableCell>;
+type Target = DropTarget<any, Props, State, DraggableCell>;
+
+const source: Source = new DragSource('CELL', cellSource, collectSource);
+const target: Target = new DropTarget('CELL', cellTarget, collectTarget);
 export default source(target(DraggableCell));

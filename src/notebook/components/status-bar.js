@@ -1,15 +1,18 @@
+/* @flow */
 import React from 'react';
 import moment from 'moment';
 
-export default class StatusBar extends React.Component {
-  static propTypes = {
-    notebook: React.PropTypes.any,
-    lastSaved: React.PropTypes.instanceOf(Date),
-    kernelSpecName: React.PropTypes.string,
-    executionState: React.PropTypes.string,
-  };
+type Props = {
+  notebook: any,
+  lastSaved: Date,
+  kernelSpecName: string,
+  executionState: string,
+};
 
-  shouldComponentUpdate(nextProps) {
+export default class StatusBar extends React.Component {
+  props: Props;
+
+  shouldComponentUpdate(nextProps: Props): boolean {
     if (this.props.notebook !== nextProps.notebook ||
         this.props.lastSaved !== nextProps.lastSaved) {
       return true;
@@ -17,7 +20,9 @@ export default class StatusBar extends React.Component {
     return false;
   }
 
-  render() {
+  render(): ?React.Element<any> {
+    const name = this.props.kernelSpecName || 'Loading...';
+
     return (
       <div className="status-bar">
         <span className="pull-right">
@@ -28,7 +33,7 @@ export default class StatusBar extends React.Component {
           }
         </span>
         <span className="pull-left">
-          <p>{this.props.kernelSpecName} | {this.props.executionState}</p>
+          <p>{name} | {this.props.executionState}</p>
         </span>
       </div>
     );

@@ -1,8 +1,11 @@
+// @flow
 import React from 'react';
 import ReactDOM from 'react-dom';
-import PureRenderMixin from 'react-addons-pure-render-mixin';
+import { shouldComponentUpdate } from 'react-addons-pure-render-mixin';
 
 import { Provider } from 'react-redux';
+
+import { Map as ImmutableMap } from 'immutable';
 
 import NotificationSystem from 'react-notification-system';
 
@@ -30,6 +33,9 @@ const store = configureStore({
   metadata: new MetadataRecord(),
   document: new DocumentRecord(),
   comms: new CommsRecord(),
+  config: new ImmutableMap({
+    theme: 'light',
+  }),
 }, reducers);
 
 // Register for debugging
@@ -40,19 +46,26 @@ initMenuHandlers(store);
 initGlobalHandlers(store);
 
 class App extends React.Component {
-  constructor(props) {
+  props: Object
+  state: Object
+  notificationSystem: NotificationSystem;
+  shouldComponentUpdate: (p: Object, s: Object) => boolean
+
+  constructor(props): void {
     super(props);
-    this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
+    this.shouldComponentUpdate = shouldComponentUpdate.bind(this);
   }
-  componentDidMount() {
-    store.dispatch(setNotificationSystem(this.refs.notificationSystem));
+  componentDidMount(): void {
+    store.dispatch(setNotificationSystem(this.notificationSystem));
   }
-  render() { // eslint-disable-line class-methods-use-this
+  render(): ?React.Element<any> { // eslint-disable-line class-methods-use-this
     return (
       <Provider store={store}>
         <div>
           <Notebook />
-          <NotificationSystem ref="notificationSystem" />
+          <NotificationSystem
+            ref={(notificationSystem) => { this.notificationSystem = notificationSystem; }}
+          />
           <link rel="stylesheet" href="../static/styles/main.css" />
         </div>
       </Provider>

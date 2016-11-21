@@ -1,7 +1,14 @@
-<img src="https://cloud.githubusercontent.com/assets/836375/15271096/98e4c102-19fe-11e6-999a-a74ffe6e2000.gif" alt="nteract animated logo" height="80px" />
+# nteract <img src="https://cloud.githubusercontent.com/assets/836375/15271096/98e4c102-19fe-11e6-999a-a74ffe6e2000.gif" alt="nteract animated logo" height="80px" align="right" />
 
+[![](https://img.shields.io/badge/version-latest-blue.svg)](https://github.com/nteract/nteract)
+[![Build Status](https://travis-ci.org/nteract/nteract.svg?branch=master)](https://travis-ci.org/nteract/nteract) [![Build status](https://ci.appveyor.com/api/projects/status/odxx4hrkcxh1oilx/branch/master?svg=true)](https://ci.appveyor.com/project/nteract/nteract/branch/master)
+[![](https://img.shields.io/badge/version-stable-blue.svg)](https://github.com/nteract/nteract/releases)
 [![codecov.io](https://codecov.io/github/nteract/nteract/coverage.svg?branch=master)](https://codecov.io/github/nteract/nteract?branch=master)
-[![Build Status](https://travis-ci.org/nteract/nteract.svg)](https://travis-ci.org/nteract/nteract) [![slack in](http://slack.nteract.in/badge.svg)](http://slack.nteract.in)
+![Documentation Coverage](https://doc.esdoc.org/github.com/nteract/nteract/badge.svg)
+[![slack in](http://slack.nteract.in/badge.svg)](http://slack.nteract.in)
+
+[**Users**](#installation---users) | [**Contributors and Development**](#installation---contributors-and-development) | [**Maintainers**](#for-maintainers-creating-a-release)
+
 
 ## Overview
 
@@ -9,43 +16,37 @@ Edit code cells, write markdown, visualize!
 
 ![nteract geojson](https://cloud.githubusercontent.com/assets/836375/18421299/d95ad398-783b-11e6-8b23-d54cf7caad1e.png)
 
-Note: this isn't feature complete yet. There will be :bug:s and quirks. Please come tell us about them!
+Note: There will be :bug:s and quirks. Please come tell us about them!
 
-### Installing
-
-Head to the [Releases](https://github.com/nteract/nteract/releases) page and download the version for your OS.
-
-<!-- TODO: Explain how to install per each platform, likely with screenshots -->
+nteract is a literate coding environment that supports Python, R, JavaScript and [other Jupyter kernels](https://github.com/ipython/ipython/wiki/IPython-kernels-for-other-languages). It wraps up the best of the web based Jupyter notebook and embeds it as a desktop application that allows you to open notebooks natively on your system. Double click a `.ipynb` on the desktop, use Spotlight on the Mac. It Just Works™
 
 ### Scope and goals
 
 * Notebook environment to explore and get things done ✅
 * Standalone cross-platform desktop application ✅
+* One notebook document/narrative per window ✅
+* Work with any Jupyter kernel using message spec v5 ✅
 * Easy install with pre-configured Python3 and JavaScript runtimes ❌
 * Grow an ecosystem of tooling to allow others to build their own platforms relying on the Jupyter specifications 🔜
 
-### Contributing
+## Installation - Users
+
+Head to the [Releases](https://github.com/nteract/nteract/releases) page and download the version for your OS.
+
+## Installation - Contributors and Development
 
 The contributors are listed in [contributors](https://github.com/nteract/nteract/graphs/contributors)
 
-nteract uses the [C4.1 (Collective Code Construction Contract)](http://rfc.zeromq.org/spec:22) process for contributions, with the caveat that we use the BSD-3-Clause to be in line with the rest of the scientific packages in NumFocus.
+To learn how to contribute, head to our [contributing guide](CONTRIBUTING.md).
 
 This project adheres to the Contributor Covenant [code of conduct](CODE_OF_CONDUCT.md).
 By participating, you are expected to uphold this code. Please report unacceptable behavior to rgbkrk@gmail.com.
 
-### Design
-
-* Full compliance with [Jupyter message spec v5](http://jupyter-client.readthedocs.org/en/latest/messaging.html)
-* Full compliance with [Notebook format v4](http://nbformat.readthedocs.org/en/latest/format_description.html)
-* Follow notebook model operations flow from [commutable](https://github.com/nteract/commutable)
-* Rely on common interfaces for kernel communication via [enchannel's comm spec](https://github.com/nteract/enchannel) (Go read it!)
-* Mocks for UI can be explored in issues, while design references go in [mocks](https://github.com/nteract/mocks)
-* React for views (pushing notebook state down into the view)
-* Full node, direct to zmq (no running a Python server underneath) - you still get Python kernels though!
+Feel free to post issues or chat in [Slack](http://slack.nteract.in/) if you need help or have questions. If you have trouble creating an account on slack, either email rgbkrk@gmail.com or post an issue on GitHub.
 
 ### Development
 
-To get started developing install a [python runtime](#python-runtime) then install [`nteract` itself](#install-nteract-itself).
+To get started developing install a [python runtime](#python-runtime) then install [`nteract` in dev mode](#install-nteract-in-dev-mode).
 
 #### Python runtime
 
@@ -56,9 +57,36 @@ python3 -m pip install ipykernel
 python3 -m ipykernel install --user
 ```
 
-#### Install `nteract` itself
+#### Install `nteract` in dev mode
 
 Requires [node 6.x and npm 3](https://docs.npmjs.com/getting-started/installing-node).
+
+**Prerequisites for Linux**
+- `python` (`v2.7` recommended, `v3.x.x` is not supported)
+- `make`
+- A proper C/C++ compiler toolchain, like [GCC](https://gcc.gnu.org/)
+
+Use your distribution's package manager to install.
+
+**Prerequisites for macOS**
+
+- `python` (`v2.7` recommended, `v3.x.x` is not supported): already installed on Mac OS X
+- `Xcode Command Line Tools`: Can be installed with `xcode-select --install`
+
+**Prerequisites for Windows**
+
+- **Option 1:** Install all the required tools and configurations using Microsoft's [windows-build-tools](https://github.com/felixrieseberg/windows-build-tools) by running `npm install -g windows-build-tools` from an elevated PowerShell (run as Administrator).
+- **Option 2:** Install dependencies and configuration manually
+   1. Visual C++ Build Environment:
+     * **Option 1:** Install [Visual C++ Build Tools](http://go.microsoft.com/fwlink/?LinkId=691126) using the *Default Install* option.
+     * **Option 2:** Install [Visual Studio 2015](https://www.visualstudio.com/products/visual-studio-community-vs) (or modify an existing installation) and select *Common Tools for Visual C++* during setup.  
+
+  > :bulb: [Windows Vista / 7 only] requires [.NET Framework 4.5.1](http://www.microsoft.com/en-us/download/details.aspx?id=40773)
+
+  2. Install [Python 2.7](https://www.python.org/downloads/) or [Miniconda 2.7](http://conda.pydata.org/miniconda.html) (`v3.x.x` is not supported), and run `npm config set python python2.7`
+  3. Launch cmd, `npm config set msvs_version 2015`
+
+##### Now you're ready to build!
 
 1. Fork this repo
 2. Clone it `git clone https://github.com/nteract/nteract`
@@ -66,49 +94,77 @@ Requires [node 6.x and npm 3](https://docs.npmjs.com/getting-started/installing-
 4. `npm install`
 5. `npm run start`
 
+As you make changes, close the entire app (cmd-q on OS X, or ctrl-c at the terminal) then run `npm run start` again.
+
+##### Progressive Webpack build for the notebook
+
+In separate terminals run:
+
+```
+npm run build:main
+npm run build:renderer:watch
+```
+
+and
+
+```
+npm run spawn
+```
+
+The webpack build will keep occurring as you modify source. When you open a new notebook, you'll get the freshest copy of the notebook app.
+
+#### Build Documentation
+You can run nteract's documentation generator by running
+
+```
+npm run build:docs
+```
+
+And then opening `docs/index.html` in your favorite browser.
+
 #### Troubleshooting
 
 > I upgraded my developer installation and things are broken!
 
-- Try `$ rm -rf node_modules` then `$ npm install`
+- Try `npm run reinstall`
 
-### Frontend background
+## For maintainers: Creating a release
 
-As much as possible, we'd like to get people speaking a common language for
-development of nteract components and packages.
+### Bump the version
 
-Core tech behind the scenes:
+```
+npm version {major|minor|patch}
+git push
+git push --tags
+npm publish
+```
 
-* [Observables](http://cycle.js.org/observables.html) through [RxJS](https://github.com/ReactiveX/RxJS)
-* [React](https://facebook.github.io/react/)
-* [Jupyter Messaging](http://jupyter-client.readthedocs.org/en/latest/messaging.html)
-* [ZeroMQ](http://zguide.zeromq.org/page:all)
+### Create the package
 
-These are our suggested tutorials and background to help you get up to speed:
+It is recommended to run `npm run reinstall` before packaging a release.
 
-* [Build your own REPL with enchannel](https://github.com/nteract/docs/blob/master/enchannel/build-your-own-repl.md)
-* [The introduction to Reactive Programming you've been missing](https://gist.github.com/staltz/868e7e9bc2a7b8c1f754)
-* [Full Stack Redux Tutorial](http://teropa.info/blog/2015/09/10/full-stack-redux-tutorial.html)
+To package a release run:
+```
+npm run dist
+```
 
-Depending on where you plug yourself in, you may find the introduction to Reactive
-programming is the biggest help.
+This needs to be done on every platform we like to ship.
 
-If you'd like to experiment with the core Jupyter messaging and Observables
-without working with React, check out [ick](https://github.com/nteract/ick),
-an interactive console.
+The OS X release has to be signed with an Apple developer key. Currently only
+Kyle (@rgbkrk) has this set up.
 
-Post in [Slack](http://slack.nteract.in/) if you need help with these or have questions. Several people
-are working through tutorials right now and would love a study group! If you have trouble creating an account, either email rgbkrk@gmail.com or post an issue on GitHub.
+Then verify that the copy of nteract in `dist/` works
+properly (mostly ad-hoc basic notebook loading and execution).
 
-### Support
-
-#### Sponsors
+## Sponsors
 
 Work on the nteract notebook is currently sponsored by
 
 [![Plotly](https://cloud.githubusercontent.com/assets/836375/13661288/0f1d6d8c-e657-11e5-897b-9d047cb30ef4.png)](https://plot.ly/)
 
 [![Domino Data Lab](https://cloud.githubusercontent.com/assets/836375/13661281/052c8506-e657-11e5-8e93-1497c6097519.png)](https://www.dominodatalab.com/)
+
+[![NumFocus](https://www.flipcause.com/uploads/thumb_NumFocus_2C_RGB.png)](http://www.numfocus.org/)
 
 We're on a common mission to build a great notebook experience. Feel free to
 [get in touch](mailto:rgbkrk@gmail.com) if you'd like to help. Resources go towards

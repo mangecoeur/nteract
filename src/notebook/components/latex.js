@@ -1,43 +1,41 @@
+/* @flow */
 import React from 'react';
-import PureRenderMixin from 'react-addons-pure-render-mixin';
-import { loadMathJax, typesetMath } from 'mathjax-electron';
+import { shouldComponentUpdate } from 'react-addons-pure-render-mixin';
+import { typesetMath } from 'mathjax-electron';
 
-// Initialize the mathjax renderer.
-// TODO: When MathJax is loaded, all components should likely re-render
-// WARNING: Tech debt here. MathJax should likely be included on the page ahead
-//          of time.
-loadMathJax(document);
+type Props = {
+  children?: React.Element<any>,
+};
 
-function isMathJaxOkYet() {
+const MathJax: global = window.MathJax;
+
+function isMathJaxOkYet(): boolean {
   return !window.disableMathJax && typeof MathJax !== 'undefined'
                                 && window.MathJax
                                 && window.MathJax.Hub.Queue;
 }
 
 export default class LatexRenderer extends React.Component {
-  static propTypes = {
-    children: React.PropTypes.oneOfType([
-      React.PropTypes.arrayOf(React.PropTypes.node),
-      React.PropTypes.node,
-    ]),
-  };
+  props: Props;
+  shouldComponentUpdate: (p: Props, s: any) => boolean;
+  rendered: HTMLElement;
 
-  constructor(props) {
-    super(props);
-    this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
+  constructor(): void {
+    super();
+    this.shouldComponentUpdate = shouldComponentUpdate.bind(this);
   }
 
-  componentDidMount() {
-    if (isMathJaxOkYet()) typesetMath(this.refs.rendered);
+  componentDidMount(): void {
+    if (isMathJaxOkYet()) typesetMath(this.rendered);
   }
 
-  componentDidUpdate() {
-    if (isMathJaxOkYet()) typesetMath(this.refs.rendered);
+  componentDidUpdate(): void {
+    if (isMathJaxOkYet()) typesetMath(this.rendered);
   }
 
-  render() {
+  render(): ?React.Element<any> {
     return (
-      <div ref="rendered">{this.props.children}</div>
+      <div ref={(rendered) => { this.rendered = rendered; }}>{this.props.children}</div>
     );
   }
 }

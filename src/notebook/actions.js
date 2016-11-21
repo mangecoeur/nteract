@@ -30,11 +30,10 @@ export function updateCellSource(id, source) {
   };
 }
 
-export function updateCellOutputs(id, outputs) {
+export function clearOutputs(id) {
   return {
-    type: constants.UPDATE_CELL_OUTPUTS,
+    type: constants.CLEAR_OUTPUTS,
     id,
-    outputs,
   };
 }
 
@@ -93,13 +92,6 @@ export function updateCellExecutionCount(id, count) {
   };
 }
 
-export function clearCellOutput(id) {
-  return {
-    type: constants.CLEAR_CELL_OUTPUT,
-    id,
-  };
-}
-
 export function changeOutputVisibility(id) {
   return {
     type: constants.CHANGE_OUTPUT_VISIBILITY,
@@ -148,6 +140,27 @@ export function focusNextCell(id, createCellIfUndefined) {
 export function focusPreviousCell(id) {
   return {
     type: constants.FOCUS_PREVIOUS_CELL,
+    id,
+  };
+}
+
+export function focusCellEditor(id) {
+  return {
+    type: constants.FOCUS_CELL_EDITOR,
+    id,
+  };
+}
+
+export function focusNextCellEditor(id) {
+  return {
+    type: constants.FOCUS_NEXT_CELL_EDITOR,
+    id,
+  };
+}
+
+export function focusPreviousCellEditor(id) {
+  return {
+    type: constants.FOCUS_PREVIOUS_CELL_EDITOR,
     id,
   };
 }
@@ -232,9 +245,76 @@ export function changeCellType(id, to) {
     to,
   };
 }
+
 export function setGithubToken(githubToken) {
   return {
     type: constants.SET_GITHUB_TOKEN,
     githubToken,
+  };
+}
+
+export function setConfigKey(key, value) {
+  return {
+    type: constants.SET_CONFIG_KEY,
+    key,
+    value,
+  };
+}
+
+export function setTheme(theme) {
+  return setConfigKey('theme', theme);
+}
+
+export function setCursorBlink(value) {
+  return setConfigKey('cursorBlinkRate', value);
+}
+
+export function toggleOutputExpansion(id) {
+  return {
+    type: constants.TOGGLE_OUTPUT_EXPANSION,
+    id,
+  };
+}
+
+/**
+ * Execute Cell action.
+ *
+ * @param {String} id - Universally Unique Identifier of cell to be executed.
+ * @param {Object} source - Source code to executed.
+ * @return {Object} executeCellAction - Action to be dispatched to reducer.
+ */
+export function executeCell(id, source) {
+  return {
+    type: constants.EXECUTE_CELL,
+    id,
+    source,
+  };
+}
+
+
+export function changeFilename(filename) {
+  return {
+    type: constants.CHANGE_FILENAME,
+    filename
+  };
+}
+
+export function save(filename, notebook) {
+  return {
+    type: constants.SAVE,
+    filename,
+    notebook
+  };
+}
+export function saveAs(filename, notebook) {
+  return {
+    type: constants.SAVE_AS,
+    filename,
+    notebook };
+}
+
+export function doneSaving() {
+  return {
+    type: constants.DONE_SAVING
   };
 }

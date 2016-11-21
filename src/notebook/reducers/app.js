@@ -57,16 +57,14 @@ export default handleActions({
     return state.set('isSaving', false)
                 .set('lastSaved', new Date());
   },
+  [constants.DONE_SAVING_CONFIG]: function doneSavingConfig(state) {
+    return state.set('configLastSaved', new Date());
+  },
   [constants.SET_NOTIFICATION_SYSTEM]: function setNotificationsSystem(state, action) {
     return state.set('notificationSystem', action.notificationSystem);
   },
-  [constants.SET_THEME]: function setTheme(state, action) {
-    return state.set('theme', action.theme);
-  },
   [constants.SET_GITHUB_TOKEN]: function setGithubToken(state, action) {
     const { githubToken } = action;
-    const github = new Github();
-    github.authenticate({ type: 'oauth', token: githubToken }); // synchronous, returns immediately
-    return state.set('github', github);
-  }
+    return state.set('token', githubToken);
+  },
 }, {});

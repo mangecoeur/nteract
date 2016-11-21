@@ -1,5 +1,6 @@
+// @flow
 import React from 'react';
-import PureRenderMixin from 'react-addons-pure-render-mixin';
+import { shouldComponentUpdate } from 'react-addons-pure-render-mixin';
 
 import CodeMirror from 'react-codemirror';
 import CM from 'codemirror';
@@ -8,12 +9,52 @@ import Rx from 'rxjs/Rx';
 
 import 'codemirror/addon/hint/show-hint';
 import 'codemirror/addon/hint/anyword-hint';
+import 'codemirror/addon/search/search';
+import 'codemirror/addon/search/searchcursor';
+
+// matching & closing parentheses and quotations
+import 'codemirror/addon/edit/matchbrackets';
+import 'codemirror/addon/edit/closebrackets';
+
+import 'codemirror/addon/dialog/dialog';
+
+import 'codemirror/mode/javascript/javascript';
+import 'codemirror/mode/css/css';
+import 'codemirror/mode/julia/julia';
+import 'codemirror/mode/r/r';
+import 'codemirror/mode/markdown/markdown';
+
+import './codemirror-ipython';
 
 import { codeComplete, pick, formChangeObject } from './complete';
 
-import { updateCellSource } from '../../../actions';
+import { focusCell, focusCellEditor, updateCellSource } from '../../../actions';
 
-function goLineUpOrEmit(editor) {
+type Props = {
+  autoCloseBrackets?: boolean,
+  id: string,
+  input: any,
+  completion?: boolean,
+  language: string,
+  tabSize?: number,
+  lineNumbers?: boolean,
+  lineWrapping?: boolean,
+  onChange?: (text: string) => void,
+  matchBrackets?: boolean,
+  theme: string,
+  cmtheme?: string,
+  cellFocused: boolean,
+  editorFocused: boolean,
+  focusAbove: Function,
+  focusBelow: Function,
+  cursorBlinkRate: number,
+};
+
+type State = {
+  source: string,
+};
+
+function goLineUpOrEmit(editor: Object): void {
   const cursor = editor.getCursor();
   if (cursor.line === 0 && cursor.ch === 0 && !editor.somethingSelected()) {
     CM.signal(editor, 'topBoundary');
@@ -22,7 +63,7 @@ function goLineUpOrEmit(editor) {
   }
 }
 
-function goLineDownOrEmit(editor) {
+function goLineDownOrEmit(editor: Object): void {
   const cursor = editor.getCursor();
   const lastLineNumber = editor.lastLine();
   const lastLine = editor.getLine(lastLineNumber);
@@ -35,46 +76,98 @@ function goLineDownOrEmit(editor) {
   }
 }
 
+/* eslint-disable quote-props */
+const excludedIntelliSenseTriggerKeys = {
+  '8': 'backspace',
+  '9': 'tab',
+  '13': 'enter',
+  '16': 'shift',
+  '17': 'ctrl',
+  '18': 'alt',
+  '19': 'pause',
+  '20': 'capslock',
+  '27': 'escape',
+  '32': 'space',
+  '33': 'pageup',
+  '34': 'pagedown',
+  '35': 'end',
+  '36': 'home',
+  '37': 'left',
+  '38': 'up',
+  '39': 'right',
+  '40': 'down',
+  '45': 'insert',
+  '46': 'delete',
+  '91': 'left window key',
+  '92': 'right window key',
+  '93': 'select',
+  '107': 'add',
+  '109': 'subtract',
+  '110': 'decimal point',
+  '111': 'divide',
+  '112': 'f1',
+  '113': 'f2',
+  '114': 'f3',
+  '115': 'f4',
+  '116': 'f5',
+  '117': 'f6',
+  '118': 'f7',
+  '119': 'f8',
+  '120': 'f9',
+  '121': 'f10',
+  '122': 'f11',
+  '123': 'f12',
+  '144': 'numlock',
+  '145': 'scrolllock',
+  '186': 'semicolon',
+  '187': 'equalsign',
+  '188': 'comma',
+  '189': 'dash',
+  // '190': 'period',
+  // '191': 'slash',
+  '192': 'graveaccent',
+  '220': 'backslash',
+  '222': 'quote',
+};
+/* eslint-enable quote-props */
+
 CM.keyMap.basic.Up = 'goLineUpOrEmit';
 CM.keyMap.basic.Down = 'goLineDownOrEmit';
 CM.commands.goLineUpOrEmit = goLineUpOrEmit;
 CM.commands.goLineDownOrEmit = goLineDownOrEmit;
 
 export default class Editor extends React.Component {
-  static propTypes = {
-    id: React.PropTypes.string,
-    input: React.PropTypes.any,
-    completion: React.PropTypes.bool,
-    language: React.PropTypes.string,
-    lineNumbers: React.PropTypes.bool,
-    lineWrapping: React.PropTypes.bool,
-    onChange: React.PropTypes.func,
-    theme: React.PropTypes.string,
-    cmtheme: React.PropTypes.string,
-    focused: React.PropTypes.bool,
-    focusAbove: React.PropTypes.func,
-    focusBelow: React.PropTypes.func,
-  };
+  state: State;
+  shouldComponentUpdate: (p: Props, s: State) => boolean;
+  onChange: (text: string) => void;
+  onFocusChange: (focused: boolean) => void;
+  hint: (editor: Object, cb: Function) => void;
+  theme: string|null;
+  cursorBlinkRate: number;
+  codemirror: CodeMirror;
+  focus: () => void;
 
   static contextTypes = {
     store: React.PropTypes.object,
   };
 
   static defaultProps = {
+    autoCloseBrackets: true, // automatically closes opening parens and quotations
     language: 'python',
     lineNumbers: false,
+    matchBrackets: true, // highlights parens that are paired
     cmtheme: 'composition',
-    focused: false,
+    cellFocused: false,
   };
 
-  constructor(props) {
+  constructor(props: Props): void {
     super(props);
-    this.shouldComponentUpdate = PureRenderMixin.shouldComponentUpdate.bind(this);
     this.state = {
       source: this.props.input,
     };
     this.onChange = this.onChange.bind(this);
-
+    this.onFocusChange = this.onFocusChange.bind(this);
+    this.shouldComponentUpdate = shouldComponentUpdate.bind(this);
     this.hint = this.completions.bind(this);
     this.hint.async = true;
 
@@ -83,67 +176,70 @@ export default class Editor extends React.Component {
     this.theme = null;
   }
 
-  componentDidMount() {
+  componentDidMount(): void {
     // On first load, if focused, set codemirror to focus
-    if (this.props.focused) {
-      this.refs.codemirror.focus();
+
+    if (this.props.editorFocused) {
+      this.codemirror.focus();
     }
 
-    const cm = this.refs.codemirror.getCodeMirror();
+    const cm = this.codemirror.getCodeMirror();
+    const store = this.context.store;
+
     cm.on('topBoundary', this.props.focusAbove);
     cm.on('bottomBoundary', this.props.focusBelow);
 
-    const inputEvents = Rx.Observable.fromEvent(cm,
-      'change', formChangeObject)
-      .filter(x => x.change.origin === '+input');
+    const keyupEvents = Rx.Observable.fromEvent(cm, 'keyup', (editor, ev) => ({ editor, ev }));
 
-    // TODO: The subscription created here needs to be cleaned up when the cell
-    //       is deleted
-    //       Suggestion: trigger off of a codemirror event
-    inputEvents
-      .switchMap(i => Rx.Observable.of(i)) // Not sure how to do this without identity function
-      // Pass through changes that aren't newlines
-      .filter(event => event.change.text.length === 1 ||
-                       (event.change.text.length === 2 &&
-                       !(event.change.text[0] === '' && event.change.text[1] === ''))
-      )
-      // Pass through only partial tokens that are composed of words
-      .filter((event) => {
-        const editor = event.cm;
-        const tokenRange = editor.findWordAt(editor.getCursor());
-        const token = editor.getRange(tokenRange.anchor, tokenRange.head);
-        return /(\w|\.)/.test(token);
-      })
-      .subscribe(event => {
-        if (!event.cm.state.completionActive && store.getState().app.executionState === 'idle') {
-          event.cm.execCommand('autocomplete');
+    keyupEvents
+      .switchMap(i => Rx.Observable.of(i))
+      .subscribe(({ editor, ev }) => {
+        const cursor = editor.getDoc().getCursor();
+        const token = editor.getTokenAt(cursor);
+
+        if (!editor.state.completionActive &&
+            !excludedIntelliSenseTriggerKeys[(ev.keyCode || ev.which).toString()] &&
+            (token.type === 'tag' || token.type === 'variable' || token.string === ' ' ||
+             token.string === '<' || token.string === '/') &&
+            store.getState().app.executionState === 'idle') {
+          editor.execCommand('autocomplete', { completeSingle: false });
         }
-      }, error => {
-        console.error(error);
       });
   }
 
-  componentWillReceiveProps(nextProps) {
+  componentWillReceiveProps(nextProps: Props): void {
     this.setState({
       source: nextProps.input,
     });
   }
 
-  componentDidUpdate(prevProps) {
-    if (this.props.focused && prevProps.focused !== this.props.focused) {
-      this.refs.codemirror.focus();
-    } else if (!this.props.focused && prevProps.focused !== this.props.focused) {
-      const cm = this.refs.codemirror.getCodeMirror();
+  componentDidUpdate(prevProps: Props): void {
+    if (this.props.editorFocused && prevProps.editorFocused !== this.props.editorFocused) {
+      this.codemirror.focus();
+    } else if (!this.props.editorFocused && prevProps.editorFocused !== this.props.editorFocused) {
+      const cm = this.codemirror.getCodeMirror();
       cm.getInputField().blur();
     }
 
     if (this.theme !== this.props.theme) {
       this.theme = this.props.theme;
-      this.refs.codemirror.getCodeMirror().refresh();
+      this.codemirror.getCodeMirror().refresh();
+    }
+    if (this.cursorBlinkRate !== this.props.cursorBlinkRate) {
+      this.cursorBlinkRate = this.props.cursorBlinkRate;
+      const cm = this.codemirror.getCodeMirror();
+      cm.setOption('cursorBlinkRate', this.cursorBlinkRate);
+      if (this.props.editorFocused) {
+        // code mirror doesn't change the blink rate immediately, we have to
+        // move the cursor, or unfocus and refocus the editor to get the blink
+        // rate to update - so here we do that (unfocus and refocus)
+        cm.getInputField().blur();
+        cm.focus();
+      }
     }
   }
 
-  onChange(text) {
+  onChange(text: string): void {
     if (this.props.onChange) {
       this.props.onChange(text);
     } else {
@@ -154,7 +250,17 @@ export default class Editor extends React.Component {
     }
   }
 
-  completions(editor, callback) {
+  onFocusChange(focused: boolean): void {
+    const { cellFocused } = this.props;
+    if (focused) {
+      this.context.store.dispatch(focusCellEditor(this.props.id));
+      if (!cellFocused) {
+        this.context.store.dispatch(focusCell(this.props.id));
+      }
+    }
+  }
+
+  completions(editor: Object, callback: Function): void {
     if (!this.props.completion) {
       return;
     }
@@ -166,12 +272,15 @@ export default class Editor extends React.Component {
       .subscribe(callback);
   }
 
-  render() {
+  render(): ?React.Element<any> {
     const options = {
+      autoCloseBrackets: this.props.autoCloseBrackets,
       mode: this.props.language,
       lineNumbers: this.props.lineNumbers,
       lineWrapping: this.props.lineWrapping,
+      matchBrackets: this.props.matchBrackets,
       theme: this.props.cmtheme,
+      cursorBlinkRate: this.props.cursorBlinkRate,
       autofocus: false,
       hintOptions: {
         hint: this.hint,
@@ -183,15 +292,19 @@ export default class Editor extends React.Component {
       extraKeys: {
         'Ctrl-Space': 'autocomplete',
       },
+      indentUnit: this.props.tabSize,
+      tabSize: this.props.tabSize,
     };
     return (
       <div className="input">
         <CodeMirror
           value={this.state.source}
-          ref="codemirror"
+          ref={(el) => { this.codemirror = el; }}
           className="cell_cm"
           options={options}
           onChange={this.onChange}
+          onFocusChange={this.onFocusChange}
+          onClick={() => this.focus()}
         />
       </div>
     );

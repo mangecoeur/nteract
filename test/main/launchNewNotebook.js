@@ -1,25 +1,27 @@
 import { expect } from 'chai';
 
-import { launchNewNotebook } from '../../build/main/launch';
+import { launchNewNotebook } from '../../lib/main/launch';
 
 const ipc = require('electron').ipcMain;
 
 describe('launchNewNotebook', () => {
   it('launches a kernel', function(done) {
     // Note that we can't use => functions because we need `this` to be mocha's
-    this.timeout(7000);
+    this.timeout(10000);
 
-    const win = launchNewNotebook('python3');
-    win.hide(); // To make it nicer to run locally
+    let win;
     ipc.on('nteract:ping:kernel', (event, kernel) => {
       win.close();
-      expect(kernel).to.equal('python3');
+      expect(kernel).to.equal('inodejs');
       done();
     });
+
+    win = launchNewNotebook('inodejs');
+    win.hide(); // To make it nicer to run locally
 
     setTimeout(() => {
       expect.fail('nteract:ping:kernel', null, 'Expected nteract:ping:kernel to be sent from frontend');
       done();
-    }, 6000)
+    }, 8000)
   });
 });

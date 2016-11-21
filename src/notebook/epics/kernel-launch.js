@@ -43,13 +43,10 @@ export function acquireKernelInfo(channels) {
 
   const obs = channels.shell
     .childOf(message)
-    .ofMessageType('kernel_info_reply')
+    .ofMessageType(['kernel_info_reply'])
     .first()
     .pluck('content', 'language_info')
     .map(setLanguageInfo);
-    // TODO: After a timeout, send kernel_info_request again
-    //       the retry may be better architecturally out of this function
-    //       though, by retrying this function entirely.
 
   return Rx.Observable.create(observer => {
     const subscription = obs.subscribe(observer);
@@ -74,7 +71,6 @@ export function newKernelObservable(kernelSpecName, cwd) {
           control: createControlSubject(identity, config),
           stdin: createStdinSubject(identity, config),
         };
-
         observer.next(setNotebookKernelInfo({
           name: kernelSpecName,
           spec: kernelSpec,
@@ -88,6 +84,7 @@ export function newKernelObservable(kernelSpecName, cwd) {
           kernelSpecName,
           kernelSpec,
         });
+        observer.complete();
       });
   });
 }

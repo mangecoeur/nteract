@@ -2,19 +2,30 @@ import path from 'path';
 
 import { shell, BrowserWindow } from 'electron';
 
-export function deferURL(event, url) {
-  event.preventDefault();
-  shell.openExternal(url);
+let launchIpynb;
+
+export function getPath(url) {
+  const nUrl = url.substring(url.indexOf('static'), path.length);
+  return path.join(__dirname, '..', '..', nUrl.replace('static/', ''));
 }
 
-export function launch(filename) {
-  let iconPath = '';
-  if (process.argv[0].match(/electron/i)) {
-    iconPath = './static/icon.png';
-  } else {
-    iconPath = '.cd/resources/app/static/icon.png';
+export function deferURL(event, url) {
+  event.preventDefault();
+  if (!url.startsWith('file:')) {
+    shell.openExternal(url);
+  } else if (url.endsWith('.ipynb')) {
+    launchIpynb(getPath(url));
   }
+}
 
+const iconPath = path.join(__dirname, '..', '..', 'static', 'icon.png');
+
+const initContextMenu = require('electron-context-menu');
+
+// Setup right-click context menu for all BrowserWindows
+initContextMenu();
+
+export function launch(filename) {
   let win = new BrowserWindow({
     width: 800,
     height: 1000,
@@ -29,8 +40,7 @@ export function launch(filename) {
     if (filename) {
       win.webContents.send('main:load', filename);
     }
-    // TODO: else, we assume it's an empty notebook
-    //       assumption right now is that launchNewNotebook will handle the follow on
+    win.webContents.send('main:load-config');
   });
 
   win.webContents.on('will-navigate', deferURL);
@@ -41,6 +51,7 @@ export function launch(filename) {
   });
   return win;
 }
+launchIpynb = launch;
 
 export function launchNewNotebook(kernelSpecName) {
   const win = launch();

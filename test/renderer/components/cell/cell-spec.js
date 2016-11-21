@@ -12,7 +12,7 @@ chai.use(sinonChai);
 
 import { Cell } from '../../../../src/notebook/components/cell/cell';
 import * as commutable from 'commutable';
-import { displayOrder, transforms } from 'transformime-react';
+import { displayOrder, transforms } from '../../../../src/notebook/components/transforms';
 
 const sharedProps = { displayOrder, transforms };
 describe('Cell', () => {
@@ -62,12 +62,20 @@ describe('Cell', () => {
       type: 'FOCUS_PREVIOUS_CELL',
       id: undefined,
     });
+    expect(store.dispatch.thirdCall).to.have.been.calledWith({
+      type: 'FOCUS_PREVIOUS_CELL_EDITOR',
+      id: undefined,
+    });
 
     inst.focusBelowCell();
-    expect(store.dispatch.thirdCall).to.have.been.calledWith({
+    expect(store.dispatch).to.have.been.calledWith({
       type: 'FOCUS_NEXT_CELL',
       id: undefined,
       createCellIfUndefined: true,
+    });
+    expect(store.dispatch.lastCall).to.have.been.calledWith({
+      type: 'FOCUS_NEXT_CELL_EDITOR',
+      id: undefined,
     });
   });
 });
